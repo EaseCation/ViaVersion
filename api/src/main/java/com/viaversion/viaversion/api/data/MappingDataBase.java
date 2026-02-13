@@ -354,6 +354,11 @@ public class MappingDataBase implements MappingData {
      */
     protected int checkValidity(final int id, final int mappedId, final String type) {
         if (mappedId == -1) {
+            // For custom blocks (ID >= 50000), pass through the original ID instead of converting to AIR
+            // This allows custom blocks from mods like FabricRock to work correctly through ViaBackwards
+            if ("blockstate".equals(type) && id >= 50000) {
+                return id;
+            }
             if (Via.getConfig().logOtherConversionWarnings()) {
                 getLogger().warning(String.format("Missing %s %s for %s %s %d", mappedVersion, type, unmappedVersion, type, id));
             }
