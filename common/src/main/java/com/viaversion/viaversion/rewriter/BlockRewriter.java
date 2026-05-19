@@ -20,6 +20,7 @@ package com.viaversion.viaversion.rewriter;
 import com.google.common.base.Preconditions;
 import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.viaversion.api.connection.UserConnection;
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.data.FullMappings;
 import com.viaversion.viaversion.api.data.MappingData;
 import com.viaversion.viaversion.api.data.Mappings;
@@ -208,11 +209,17 @@ public class BlockRewriter<C extends ClientboundPacketType> {
                 final int id = blockEntity.typeId();
                 final int mappedId = blockEntityMappings.getNewId(id);
                 if (mappedId == -1) {
-                    toRemove.add(i);
-                    continue;
-                }
+                    final int customId = mappedBlockEntityTypeId(connection, id);
+                    if (customId == -1) {
+                        toRemove.add(i);
+                        continue;
+                    }
 
-                if (id != mappedId) {
+                    if (id != customId) {
+                        blockEntity = blockEntity.withTypeId(customId);
+                        blockEntities.set(i, blockEntity);
+                    }
+                } else if (id != mappedId) {
                     blockEntity = blockEntity.withTypeId(mappedId);
                     blockEntities.set(i, blockEntity);
                 }
@@ -257,10 +264,15 @@ public class BlockRewriter<C extends ClientboundPacketType> {
             if (mappings != null) {
                 final int mappedBlockEntityId = mappings.getNewId(blockEntityId);
                 if (mappedBlockEntityId == -1) {
-                    wrapper.cancel();
-                    return;
+                    final int customId = mappedBlockEntityTypeId(wrapper.user(), blockEntityId);
+                    if (customId == -1) {
+                        wrapper.cancel();
+                        return;
+                    }
+                    wrapper.write(Types.VAR_INT, customId);
+                } else {
+                    wrapper.write(Types.VAR_INT, mappedBlockEntityId);
                 }
-                wrapper.write(Types.VAR_INT, mappedBlockEntityId);
             } else {
                 wrapper.write(Types.VAR_INT, blockEntityId);
             }
@@ -280,6 +292,11 @@ public class BlockRewriter<C extends ClientboundPacketType> {
      * @param blockEntity the block entity
      */
     public void handleBlockEntity(final UserConnection connection, final BlockEntity blockEntity) {
+    }
+
+    private int mappedBlockEntityTypeId(final UserConnection connection, final int id) {
+        final CustomRegistryStorage registries = connection.get(CustomRegistryStorage.class);
+        return registries != null ? registries.mappedId(CustomRegistryStorage.BLOCK_ENTITY_TYPE, id) : -1;
     }
 
     @FunctionalInterface
