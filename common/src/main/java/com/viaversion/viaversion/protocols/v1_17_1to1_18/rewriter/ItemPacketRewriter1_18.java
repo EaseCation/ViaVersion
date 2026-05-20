@@ -17,6 +17,7 @@
  */
 package com.viaversion.viaversion.protocols.v1_17_1to1_18.rewriter;
 
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.data.ParticleMappings;
 import com.viaversion.viaversion.api.protocol.remapper.PacketHandlers;
 import com.viaversion.viaversion.api.type.Types;
@@ -84,7 +85,7 @@ public final class ItemPacketRewriter1_18 extends ItemRewriter<ClientboundPacket
                     ParticleMappings mappings = protocol.getMappingData().getParticleMappings();
                     if (mappings.isBlockParticle(id)) {
                         int data = wrapper.passthrough(Types.VAR_INT);
-                        wrapper.set(Types.VAR_INT, 0, protocol.getMappingData().getNewBlockStateId(data));
+                        wrapper.set(Types.VAR_INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data));
                     } else if (mappings.isItemParticle(id)) {
                         handleItemToClient(wrapper.user(), wrapper.passthrough(Types.ITEM1_13_2));
                     }

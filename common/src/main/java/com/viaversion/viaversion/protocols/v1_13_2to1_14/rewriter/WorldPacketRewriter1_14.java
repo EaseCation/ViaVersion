@@ -17,6 +17,7 @@
  */
 package com.viaversion.viaversion.protocols.v1_13_2to1_14.rewriter;
 
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.nbt.tag.LongArrayTag;
 import com.viaversion.viaversion.api.Via;
@@ -87,7 +88,7 @@ public class WorldPacketRewriter1_14 {
                 handler(wrapper -> {
                     int id = wrapper.get(Types.VAR_INT, 0);
 
-                    wrapper.set(Types.VAR_INT, 0, protocol.getMappingData().getNewBlockStateId(id));
+                    wrapper.set(Types.VAR_INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), id));
                 });
             }
         });
@@ -140,7 +141,7 @@ public class WorldPacketRewriter1_14 {
                 boolean hasBlock = false;
                 for (int i = 0; i < blocks.size(); i++) {
                     int old = blocks.idByIndex(i);
-                    int newId = protocol.getMappingData().getNewBlockStateId(old);
+                    int newId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), old);
                     if (!hasBlock && newId != air && newId != voidAir && newId != caveAir) { // air, void_air, cave_air
                         hasBlock = true;
                     }
@@ -259,7 +260,7 @@ public class WorldPacketRewriter1_14 {
                     if (id == 1010) { // Play record
                         wrapper.set(Types.INT, 1, protocol.getMappingData().getNewItemId(data));
                     } else if (id == 2001) { // Block break + block break sound
-                        wrapper.set(Types.INT, 1, protocol.getMappingData().getNewBlockStateId(data));
+                        wrapper.set(Types.INT, 1, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data));
                     }
                 });
             }

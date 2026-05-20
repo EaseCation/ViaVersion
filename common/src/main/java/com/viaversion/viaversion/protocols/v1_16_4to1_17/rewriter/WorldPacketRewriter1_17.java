@@ -17,6 +17,7 @@
  */
 package com.viaversion.viaversion.protocols.v1_16_4to1_17.rewriter;
 
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.minecraft.BlockChangeRecord;
 import com.viaversion.viaversion.api.minecraft.BlockChangeRecord1_16_2;
 import com.viaversion.viaversion.api.minecraft.chunks.Chunk;
@@ -152,7 +153,7 @@ public final class WorldPacketRewriter1_17 {
             for (int x = 0; x < 16; x++) {
                 for (int y = 0; y < 16; y++) {
                     for (int z = 0; z < 16; z++) {
-                        int blockStateId = Protocol1_16_4To1_17.MAPPINGS.getNewBlockStateId(palette.idAt(x, y, z));
+                        int blockStateId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), Protocol1_16_4To1_17.MAPPINGS, palette.idAt(x, y, z));
                         blockChangeRecords[j++] = new BlockChangeRecord1_16_2(x, y, z, blockStateId);
                     }
                 }

@@ -17,6 +17,7 @@
  */
 package com.viaversion.viaversion.protocols.v1_19_4to1_20.rewriter;
 
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.minecraft.BlockChangeRecord;
 import com.viaversion.viaversion.api.minecraft.chunks.Chunk;
 import com.viaversion.viaversion.api.protocol.remapper.PacketHandlers;
@@ -123,7 +124,7 @@ public final class ItemPacketRewriter1_20 extends ItemRewriter<ClientboundPacket
                 read(Types.BOOLEAN); // Suppress light updates
                 handler(wrapper -> {
                     for (final BlockChangeRecord record : wrapper.passthrough(Types.VAR_LONG_BLOCK_CHANGE_ARRAY)) {
-                        record.setBlockId(protocol.getMappingData().getNewBlockStateId(record.getBlockId()));
+                        record.setBlockId(CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), record.getBlockId()));
                     }
                 });
             }

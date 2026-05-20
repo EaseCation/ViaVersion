@@ -17,6 +17,7 @@
  */
 package com.viaversion.viaversion.protocols.v1_20to1_20_2.rewriter;
 
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.nbt.tag.ListTag;
 import com.viaversion.nbt.tag.NumberTag;
@@ -109,7 +110,7 @@ public final class BlockItemPacketRewriter1_20_2 extends ItemRewriter<Clientboun
                 final DataPalette blockPalette = section.palette(PaletteType.BLOCKS);
                 for (int i = 0; i < blockPalette.size(); i++) {
                     final int id = blockPalette.idByIndex(i);
-                    blockPalette.setIdByIndex(i, protocol.getMappingData().getNewBlockStateId(id));
+                    blockPalette.setIdByIndex(i, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), id));
                 }
             }
 

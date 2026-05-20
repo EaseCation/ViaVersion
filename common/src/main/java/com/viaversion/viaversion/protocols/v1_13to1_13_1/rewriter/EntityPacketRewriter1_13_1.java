@@ -17,6 +17,7 @@
  */
 package com.viaversion.viaversion.protocols.v1_13to1_13_1.rewriter;
 
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.minecraft.ClientWorld;
 import com.viaversion.viaversion.api.minecraft.entities.EntityType;
 import com.viaversion.viaversion.api.minecraft.entities.EntityTypes1_13;
@@ -87,7 +88,7 @@ public class EntityPacketRewriter1_13_1 extends EntityRewriter<ClientboundPacket
 
                     if (entType != null) {
                         if (entType.is(EntityTypes1_13.EntityType.FALLING_BLOCK)) {
-                            wrapper.set(Types.INT, 0, protocol.getMappingData().getNewBlockStateId(data));
+                            wrapper.set(Types.INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data));
                         }
                         // Register Type ID
                         wrapper.user().getEntityTracker(Protocol1_13To1_13_1.class).addEntity(entityId, entType);

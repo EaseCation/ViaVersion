@@ -17,6 +17,7 @@
  */
 package com.viaversion.viaversion.protocols.v1_20_3to1_20_5.rewriter;
 
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.nbt.tag.ByteTag;
 import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.nbt.tag.IntArrayTag;
@@ -261,7 +262,7 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
                 particle.add(Types.FLOAT, particle.<Float>removeArgument(3).getValue());
             } else if (mappings.isBlockParticle(particleId)) {
                 final int blockStateId = wrapper.read(Types.VAR_INT);
-                particle.add(Types.VAR_INT, protocol.getMappingData().getNewBlockStateId(blockStateId));
+                particle.add(Types.VAR_INT, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), blockStateId));
             } else if (mappings.isItemParticle(particleId)) {
                 final Item item = handleNonEmptyItemToClient(wrapper.user(), wrapper.read(Types.ITEM1_20_2));
                 particle.add(VersionedTypes.V1_20_5.item, item);

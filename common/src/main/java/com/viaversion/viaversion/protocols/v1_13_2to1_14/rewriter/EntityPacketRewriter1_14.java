@@ -17,6 +17,7 @@
  */
 package com.viaversion.viaversion.protocols.v1_13_2to1_14.rewriter;
 
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.Via;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import com.viaversion.viaversion.api.minecraft.ClientWorld;
@@ -90,7 +91,7 @@ public class EntityPacketRewriter1_14 extends EntityRewriter<ClientboundPackets1
                     typeId = newEntityId(type1_13.getId());
                     EntityType type1_14 = EntityTypes1_14.getTypeFromId(typeId);
                     if (type1_14.is(EntityTypes1_14.FALLING_BLOCK)) {
-                        wrapper.set(Types.INT, 0, protocol.getMappingData().getNewBlockStateId(data));
+                        wrapper.set(Types.INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data));
                     } else if ((type1_14.is(EntityTypes1_14.ITEM) && data > 0)
                         || type1_14.isOrHasParent(EntityTypes1_14.ABSTRACT_ARROW)) {
                         if (type1_14.isOrHasParent(EntityTypes1_14.ABSTRACT_ARROW)) {

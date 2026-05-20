@@ -23,6 +23,8 @@
 package com.viaversion.viaversion.api.protocol.storage;
 
 import com.viaversion.viaversion.api.connection.StorableObject;
+import com.viaversion.viaversion.api.connection.UserConnection;
+import com.viaversion.viaversion.api.data.MappingData;
 import java.util.HashMap;
 import java.util.Map;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -36,6 +38,12 @@ public final class CustomRegistryStorage implements StorableObject {
 
     public void put(final String registryKey, final int sourceId, final int targetId, final @Nullable String identifier) {
         overlays.computeIfAbsent(registryKey, key -> new RegistryOverlay()).put(sourceId, targetId, identifier);
+    }
+
+    public static int mappedBlockStateId(final UserConnection connection, final MappingData mappingData, final int sourceId) {
+        final CustomRegistryStorage storage = connection.get(CustomRegistryStorage.class);
+        final int overlayId = storage != null ? storage.mappedId(BLOCK_STATE, sourceId) : -1;
+        return overlayId != -1 ? overlayId : mappingData.getNewBlockStateId(sourceId);
     }
 
     public int mappedId(final String registryKey, final int sourceId) {
@@ -58,12 +66,21 @@ public final class CustomRegistryStorage implements StorableObject {
         return overlay != null ? overlay.maxTargetId : -1;
     }
 
+    public int maxSourceId(final String registryKey) {
+        final RegistryOverlay overlay = overlays.get(registryKey);
+        return overlay != null ? overlay.maxSourceId : -1;
+    }
+
     private static final class RegistryOverlay {
         private final Map<Integer, Entry> mappings = new HashMap<>();
+        private int maxSourceId = -1;
         private int maxTargetId = -1;
 
         private void put(final int sourceId, final int targetId, final @Nullable String identifier) {
             mappings.put(sourceId, new Entry(targetId, identifier));
+            if (sourceId > maxSourceId) {
+                maxSourceId = sourceId;
+            }
             if (targetId > maxTargetId) {
                 maxTargetId = targetId;
             }

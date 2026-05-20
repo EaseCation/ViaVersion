@@ -17,6 +17,7 @@
  */
 package com.viaversion.viaversion.protocols.v1_20_5to1_21.rewriter;
 
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.nbt.tag.ByteTag;
 import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.viaversion.api.Via;
@@ -122,7 +123,7 @@ public final class BlockItemPacketRewriter1_21 extends StructuredItemRewriter<Cl
 
                 wrapper.write(Types.INT, jukeboxSong);
             } else if (id == 2001) {
-                wrapper.write(Types.INT, protocol.getMappingData().getNewBlockStateId(data));
+                wrapper.write(Types.INT, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data));
             } else {
                 wrapper.write(Types.INT, data);
             }

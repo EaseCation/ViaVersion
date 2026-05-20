@@ -17,6 +17,7 @@
  */
 package com.viaversion.viaversion.protocols.v1_16_1to1_16_2.rewriter;
 
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.minecraft.BlockChangeRecord;
 import com.viaversion.viaversion.api.minecraft.BlockChangeRecord1_16_2;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
@@ -62,7 +63,7 @@ public class WorldPacketRewriter1_16_2 {
                 }
 
                 // Absolute y -> relative chunk section y
-                int blockId = protocol.getMappingData().getNewBlockStateId(record.getBlockId());
+                int blockId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), record.getBlockId());
                 list.add(new BlockChangeRecord1_16_2(record.getSectionX(), record.getSectionY(), record.getSectionZ(), blockId));
             }
 

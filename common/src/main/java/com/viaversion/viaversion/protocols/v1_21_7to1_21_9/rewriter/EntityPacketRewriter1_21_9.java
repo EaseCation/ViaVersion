@@ -17,6 +17,7 @@
  */
 package com.viaversion.viaversion.protocols.v1_21_7to1_21_9.rewriter;
 
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import com.viaversion.viaversion.api.minecraft.GlobalBlockPosition;
@@ -66,7 +67,7 @@ public final class EntityPacketRewriter1_21_9 extends EntityRewriter<Clientbound
             final int data = wrapper.passthrough(Types.VAR_INT);
             final EntityType entityType = trackAndRewrite(wrapper, entityTypeId, entityId);
             if (protocol.getMappingData() != null && entityType == EntityTypes1_21_9.FALLING_BLOCK) {
-                final int mappedBlockStateId = protocol.getMappingData().getNewBlockStateId(data);
+                final int mappedBlockStateId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data);
                 wrapper.set(Types.VAR_INT, 2, mappedBlockStateId);
             }
 

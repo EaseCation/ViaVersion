@@ -17,6 +17,7 @@
  */
 package com.viaversion.viaversion.protocols.v1_21_4to1_21_5.rewriter;
 
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.Holder;
@@ -231,7 +232,7 @@ public final class EntityPacketRewriter1_21_5 extends EntityRewriter<Clientbound
         // Minecarts finally have the block state data type
         filter().type(EntityTypes1_21_5.ABSTRACT_MINECART).index(11).handler((event, data) -> {
             final int state = (int) data.getValue();
-            final int mappedBlockState = protocol.getMappingData().getNewBlockStateId(state);
+            final int mappedBlockState = CustomRegistryStorage.mappedBlockStateId(event.user(), protocol.getMappingData(), state);
             if (mappedBlockState == 0) {
                 event.cancel();
                 return;

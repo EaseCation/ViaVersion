@@ -17,6 +17,7 @@
  */
 package com.viaversion.viaversion.protocols.v1_19_3to1_19_4.rewriter;
 
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.protocol.remapper.PacketHandlers;
 import com.viaversion.viaversion.api.type.Types;
@@ -62,7 +63,7 @@ public final class ItemPacketRewriter1_19_4 extends ItemRewriter<ClientboundPack
                             wrapper.set(Types.INT, 1, 0);
                         }
                     } else if (id == 2001) { // Block break + block break sound
-                        wrapper.set(Types.INT, 1, protocol.getMappingData().getNewBlockStateId(data));
+                        wrapper.set(Types.INT, 1, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data));
                     }
                 });
             }

@@ -17,6 +17,7 @@
  */
 package com.viaversion.viaversion.protocols.v1_13to1_13_1.rewriter;
 
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.minecraft.ClientWorld;
 import com.viaversion.viaversion.api.minecraft.chunks.Chunk;
 import com.viaversion.viaversion.api.protocol.remapper.PacketHandlers;
@@ -76,7 +77,7 @@ public class WorldPacketRewriter1_13_1 {
                     } else if (id == 1010) { // Play record
                         wrapper.set(Types.INT, 1, protocol.getMappingData().getNewItemId(wrapper.get(Types.INT, 1)));
                     } else if (id == 2001) { // Block break + block break sound
-                        wrapper.set(Types.INT, 1, protocol.getMappingData().getNewBlockStateId(wrapper.get(Types.INT, 1)));
+                        wrapper.set(Types.INT, 1, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), wrapper.get(Types.INT, 1)));
                     }
                 });
             }
