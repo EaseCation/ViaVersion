@@ -91,7 +91,7 @@ public class ParticleRewriter<C extends ClientboundPacketType> implements com.vi
             ParticleMappings mappings = protocol.getMappingData().getParticleMappings();
             if (mappings.isBlockParticle(id)) {
                 int data = wrapper.read(Types.VAR_INT);
-                wrapper.write(Types.VAR_INT, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data));
+                wrapper.write(Types.VAR_INT, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), data));
             } else if (mappings.isItemParticle(id)) {
                 ItemRewriter<?> itemRewriter = protocol.getItemRewriter();
                 final Item item = wrapper.read(itemRewriter.itemType());
@@ -225,7 +225,7 @@ public class ParticleRewriter<C extends ClientboundPacketType> implements com.vi
         final int id = particle.id();
         if (mappings.isBlockParticle(id)) {
             final Particle.ParticleData<Integer> data = particle.getArgument(0);
-            data.setValue(CustomRegistryStorage.mappedBlockStateId(connection, protocol.getMappingData(), data.getValue()));
+            data.setValue(CustomRegistryStorage.mappedBlockStateId(connection, protocol, protocol.getMappingData(), data.getValue()));
         } else if (mappings.isItemParticle(id) && itemRewriter != null) {
             final Particle.ParticleData<Item> data = particle.getArgument(0);
             final Item item = itemRewriter.handleItemToClient(connection, data.getValue());

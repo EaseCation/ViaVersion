@@ -145,11 +145,17 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
         protocol.registerClientbound(ClientboundPackets1_20_3.LEVEL_CHUNK_WITH_LIGHT, wrapper -> {
             final Chunk chunk = blockRewriter.handleChunk1_19(wrapper, ChunkType1_20_2::new);
             for (int i = 0; i < chunk.blockEntities().size(); i++) {
-                final BlockEntity blockEntity = chunk.blockEntities().get(i);
-                if (isUnknownBlockEntity(blockEntity.typeId())) {
+                BlockEntity blockEntity = chunk.blockEntities().get(i);
+                final int typeId = blockEntity.typeId();
+                final int mappedTypeId = mappedBlockEntityTypeId(wrapper.user(), typeId);
+                if (mappedTypeId == -1 || !isCustomBlockEntityType(wrapper.user(), typeId) && isUnknownBlockEntity(mappedTypeId)) {
                     // The client no longer ignores unknown block entities
                     chunk.blockEntities().remove(i--);
                     continue;
+                }
+                if (typeId != mappedTypeId) {
+                    blockEntity = blockEntity.withTypeId(mappedTypeId);
+                    chunk.blockEntities().set(i, blockEntity);
                 }
 
                 updateBlockEntityTag(wrapper.user(), null, blockEntity.tag());
@@ -158,11 +164,13 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
         protocol.registerClientbound(ClientboundPackets1_20_3.BLOCK_ENTITY_DATA, wrapper -> {
             wrapper.passthrough(Types.BLOCK_POSITION1_14); // Position
 
-            final int typeId = wrapper.passthrough(Types.VAR_INT);
-            if (isUnknownBlockEntity(typeId)) {
+            final int typeId = wrapper.read(Types.VAR_INT);
+            final int mappedTypeId = mappedBlockEntityTypeId(wrapper.user(), typeId);
+            if (mappedTypeId == -1 || !isCustomBlockEntityType(wrapper.user(), typeId) && isUnknownBlockEntity(mappedTypeId)) {
                 wrapper.cancel();
                 return;
             }
+            wrapper.write(Types.VAR_INT, mappedTypeId);
 
             CompoundTag tag = wrapper.read(Types.TRUSTED_COMPOUND_TAG);
             if (tag != null) {
@@ -262,7 +270,7 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
                 particle.add(Types.FLOAT, particle.<Float>removeArgument(3).getValue());
             } else if (mappings.isBlockParticle(particleId)) {
                 final int blockStateId = wrapper.read(Types.VAR_INT);
-                particle.add(Types.VAR_INT, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), blockStateId));
+                particle.add(Types.VAR_INT, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), blockStateId));
             } else if (mappings.isItemParticle(particleId)) {
                 final Item item = handleNonEmptyItemToClient(wrapper.user(), wrapper.read(Types.ITEM1_20_2));
                 particle.add(VersionedTypes.V1_20_5.item, item);
@@ -1440,6 +1448,15 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
 
     private boolean isUnknownBlockEntity(final int id) {
         return id < 0 || id > 42;
+    }
+
+    private int mappedBlockEntityTypeId(final UserConnection connection, final int id) {
+        return CustomRegistryStorage.mappedBlockEntityTypeId(connection, protocol, protocol.getMappingData().getBlockEntityMappings(), id);
+    }
+
+    private boolean isCustomBlockEntityType(final UserConnection connection, final int id) {
+        final CustomRegistryStorage storage = connection.get(CustomRegistryStorage.class);
+        return storage != null && storage.mappedId(protocol.getClass(), CustomRegistryStorage.BLOCK_ENTITY_TYPE, id) != -1;
     }
 
     private void updateBlockEntityTag(final UserConnection connection, @Nullable final StructuredDataContainer data, final CompoundTag tag) {

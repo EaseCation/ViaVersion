@@ -171,10 +171,6 @@ public class BlockRewriter<C extends ClientboundPacketType> {
         });
     }
 
-    public void handleChunk(Chunk chunk) {
-        handleChunk(null, chunk);
-    }
-
     public void handleChunk(@Nullable UserConnection connection, Chunk chunk) {
         for (int s = 0; s < chunk.getSections().length; s++) {
             ChunkSection section = chunk.getSections()[s];
@@ -184,7 +180,7 @@ public class BlockRewriter<C extends ClientboundPacketType> {
 
             DataPalette palette = section.palette(PaletteType.BLOCKS);
             for (int i = 0; i < palette.size(); i++) {
-                int mappedBlockStateId = connection != null ? mappedBlockStateId(connection, palette.idByIndex(i)) : protocol.getMappingData().getNewBlockStateId(palette.idByIndex(i));
+                int mappedBlockStateId = mappedBlockStateId(connection, palette.idByIndex(i));
                 palette.setIdByIndex(i, mappedBlockStateId);
             }
         }
@@ -211,19 +207,12 @@ public class BlockRewriter<C extends ClientboundPacketType> {
             BlockEntity blockEntity = blockEntities.get(i);
             if (blockEntityMappings != null) {
                 final int id = blockEntity.typeId();
-                final int mappedId = blockEntityMappings.getNewId(id);
+                final int mappedId = mappedBlockEntityTypeId(connection, id);
                 if (mappedId == -1) {
-                    final int customId = mappedBlockEntityTypeId(connection, id);
-                    if (customId == -1) {
-                        toRemove.add(i);
-                        continue;
-                    }
-
-                    if (id != customId) {
-                        blockEntity = blockEntity.withTypeId(customId);
-                        blockEntities.set(i, blockEntity);
-                    }
-                } else if (id != mappedId) {
+                    toRemove.add(i);
+                    continue;
+                }
+                if (id != mappedId) {
                     blockEntity = blockEntity.withTypeId(mappedId);
                     blockEntities.set(i, blockEntity);
                 }
@@ -245,10 +234,16 @@ public class BlockRewriter<C extends ClientboundPacketType> {
         final EntityTracker tracker = protocol.getEntityRewriter().tracker(wrapper.user());
         Preconditions.checkArgument(tracker.biomesSent() != -1, "Biome count not set");
         Preconditions.checkArgument(tracker.currentWorldSectionHeight() != -1, "Section height not set");
-        final Type<Chunk> chunkType = chunkTypeSupplier.supply(tracker.currentWorldSectionHeight(),
-            MathUtil.ceilLog2(globalPaletteBlockBits(wrapper.user(), protocol.getMappingData().getBlockStateMappings().mappedSize())),
-            MathUtil.ceilLog2(tracker.biomesSent()));
-        final Chunk chunk = wrapper.passthrough(chunkType);
+        final Mappings blockStateMappings = protocol.getMappingData().getBlockStateMappings();
+        final int biomeBits = MathUtil.ceilLog2(tracker.biomesSent());
+        final Type<Chunk> inputChunkType = chunkTypeSupplier.supply(tracker.currentWorldSectionHeight(),
+            MathUtil.ceilLog2(inputGlobalPaletteBlockSize(wrapper.user(), blockStateMappings.size())),
+            biomeBits);
+        final Type<Chunk> outputChunkType = chunkTypeSupplier.supply(tracker.currentWorldSectionHeight(),
+            MathUtil.ceilLog2(outputGlobalPaletteBlockSize(wrapper.user(), blockStateMappings.mappedSize())),
+            biomeBits);
+        final Chunk chunk = wrapper.read(inputChunkType);
+        wrapper.write(outputChunkType, chunk);
         for (final ChunkSection section : chunk.getSections()) {
             final DataPalette blockPalette = section.palette(PaletteType.BLOCKS);
             for (int i = 0; i < blockPalette.size(); i++) {
@@ -265,21 +260,12 @@ public class BlockRewriter<C extends ClientboundPacketType> {
 
             final int blockEntityId = wrapper.read(Types.VAR_INT);
             final Mappings mappings = protocol.getMappingData().getBlockEntityMappings();
-            if (mappings != null) {
-                final int mappedBlockEntityId = mappings.getNewId(blockEntityId);
-                if (mappedBlockEntityId == -1) {
-                    final int customId = mappedBlockEntityTypeId(wrapper.user(), blockEntityId);
-                    if (customId == -1) {
-                        wrapper.cancel();
-                        return;
-                    }
-                    wrapper.write(Types.VAR_INT, customId);
-                } else {
-                    wrapper.write(Types.VAR_INT, mappedBlockEntityId);
-                }
-            } else {
-                wrapper.write(Types.VAR_INT, blockEntityId);
+            final int mappedBlockEntityId = mappedBlockEntityTypeId(wrapper.user(), blockEntityId);
+            if (mappedBlockEntityId == -1) {
+                wrapper.cancel();
+                return;
             }
+            wrapper.write(Types.VAR_INT, mappedBlockEntityId);
 
             final CompoundTag tag = wrapper.passthrough(compoundTagType);
             if (tag != null) {
@@ -299,20 +285,27 @@ public class BlockRewriter<C extends ClientboundPacketType> {
     }
 
     private int mappedBlockEntityTypeId(final UserConnection connection, final int id) {
-        final CustomRegistryStorage registries = connection.get(CustomRegistryStorage.class);
-        return registries != null ? registries.mappedId(CustomRegistryStorage.BLOCK_ENTITY_TYPE, id) : -1;
+        return CustomRegistryStorage.mappedBlockEntityTypeId(connection, protocol, protocol.getMappingData().getBlockEntityMappings(), id);
     }
 
-    private int mappedBlockStateId(final UserConnection connection, final int id) {
-        return CustomRegistryStorage.mappedBlockStateId(connection, protocol.getMappingData(), id);
+    private int mappedBlockStateId(final @Nullable UserConnection connection, final int id) {
+        return connection != null ? CustomRegistryStorage.mappedBlockStateId(connection, protocol, protocol.getMappingData(), id) : protocol.getMappingData().getNewBlockStateId(id);
     }
 
-    private int globalPaletteBlockBits(final UserConnection connection, final int vanillaBits) {
+    private int inputGlobalPaletteBlockSize(final UserConnection connection, final int vanillaSize) {
         final CustomRegistryStorage registries = connection.get(CustomRegistryStorage.class);
         if (registries == null || !registries.hasRegistry(CustomRegistryStorage.BLOCK_STATE)) {
-            return vanillaBits;
+            return vanillaSize;
         }
-        return Math.max(vanillaBits, registries.maxSourceId(CustomRegistryStorage.BLOCK_STATE) + 1);
+        return Math.max(vanillaSize, registries.maxSourceId(protocol.getClass(), CustomRegistryStorage.BLOCK_STATE) + 1);
+    }
+
+    private int outputGlobalPaletteBlockSize(final UserConnection connection, final int vanillaSize) {
+        final CustomRegistryStorage registries = connection.get(CustomRegistryStorage.class);
+        if (registries == null || !registries.hasRegistry(CustomRegistryStorage.BLOCK_STATE)) {
+            return vanillaSize;
+        }
+        return Math.max(vanillaSize, registries.maxTargetId(protocol.getClass(), CustomRegistryStorage.BLOCK_STATE) + 1);
     }
 
     @FunctionalInterface

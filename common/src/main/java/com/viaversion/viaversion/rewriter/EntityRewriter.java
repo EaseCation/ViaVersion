@@ -230,11 +230,11 @@ public abstract class EntityRewriter<C extends ClientboundPacketType, T extends 
                 data.setValue(protocol.getItemRewriter().handleItemToClient(event.user(), data.value()));
             } else if (type == blockStateType) {
                 int value = data.value();
-                data.setValue(CustomRegistryStorage.mappedBlockStateId(event.user(), protocol.getMappingData(), value));
+                data.setValue(CustomRegistryStorage.mappedBlockStateId(event.user(), protocol, protocol.getMappingData(), value));
             } else if (type == optionalBlockStateType) {
                 int value = data.value();
                 if (value != 0) {
-                    data.setValue(CustomRegistryStorage.mappedBlockStateId(event.user(), protocol.getMappingData(), value));
+                    data.setValue(CustomRegistryStorage.mappedBlockStateId(event.user(), protocol, protocol.getMappingData(), value));
                 }
             } else if (type == particleType) {
                 protocol.getParticleRewriter().rewriteParticle(event.user(), data.value());
@@ -255,7 +255,7 @@ public abstract class EntityRewriter<C extends ClientboundPacketType, T extends 
     public void registerBlockStateHandler(final EntityType entityType, final int index) {
         filter().type(entityType).index(index).handler((event, data) -> {
             final int state = (int) data.getValue();
-            data.setValue(CustomRegistryStorage.mappedBlockStateId(event.user(), protocol.getMappingData(), state));
+            data.setValue(CustomRegistryStorage.mappedBlockStateId(event.user(), protocol, protocol.getMappingData(), state));
         });
     }
 
@@ -286,7 +286,7 @@ public abstract class EntityRewriter<C extends ClientboundPacketType, T extends 
                     int entityId = wrapper.get(Types.VAR_INT, 0);
                     EntityType entityType = tracker(wrapper.user()).entityType(entityId);
                     if (entityType == fallingBlockType) {
-                        wrapper.set(Types.INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), wrapper.get(Types.INT, 0)));
+                        wrapper.set(Types.INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), wrapper.get(Types.INT, 0)));
                     }
                 });
             }
@@ -308,7 +308,7 @@ public abstract class EntityRewriter<C extends ClientboundPacketType, T extends 
 
             final EntityType entityType = trackAndRewrite(wrapper, entityTypeId, entityId);
             if (protocol.getMappingData() != null && entityType == fallingBlockType) {
-                final int mappedBlockStateId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data);
+                final int mappedBlockStateId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), data);
                 wrapper.set(Types.VAR_INT, 2, mappedBlockStateId);
             }
         });
@@ -329,7 +329,7 @@ public abstract class EntityRewriter<C extends ClientboundPacketType, T extends 
             final int data = wrapper.passthrough(Types.VAR_INT);
             final EntityType entityType = trackAndRewrite(wrapper, entityTypeId, entityId);
             if (protocol.getMappingData() != null && entityType == fallingBlockType) {
-                final int mappedBlockStateId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data);
+                final int mappedBlockStateId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), data);
                 wrapper.set(Types.VAR_INT, 2, mappedBlockStateId);
             }
         });

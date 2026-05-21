@@ -26,6 +26,7 @@ import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.codec.Ops;
 import com.viaversion.viaversion.api.protocol.Protocol;
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.type.Type;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.util.Rewritable;
@@ -58,8 +59,7 @@ public record BlockEntityData(int type, CompoundTag tag) implements Rewritable {
 
     @Override
     public BlockEntityData rewrite(final UserConnection connection, final Protocol<?, ?, ?, ?> protocol, final boolean clientbound) {
-        final int mappedType = protocol.getMappingData().getBlockEntityMappings().getNewId(type);
-        // Empty mappings might be possible for removed block entities, set a dummy value in that case. Will be handled fine by server and client without losing data
-        return new BlockEntityData(mappedType != -1 ? mappedType : 0, tag);
+        final int mappedType = CustomRegistryStorage.mappedBlockEntityTypeId(connection, protocol, protocol.getMappingData().getBlockEntityMappings(), type);
+        return new BlockEntityData(mappedType != -1 ? mappedType : type, tag);
     }
 }

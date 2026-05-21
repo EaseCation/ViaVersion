@@ -91,7 +91,7 @@ public class EntityPacketRewriter1_14 extends EntityRewriter<ClientboundPackets1
                     typeId = newEntityId(type1_13.getId());
                     EntityType type1_14 = EntityTypes1_14.getTypeFromId(typeId);
                     if (type1_14.is(EntityTypes1_14.FALLING_BLOCK)) {
-                        wrapper.set(Types.INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data));
+                        wrapper.set(Types.INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), data));
                     } else if ((type1_14.is(EntityTypes1_14.ITEM) && data > 0)
                         || type1_14.isOrHasParent(EntityTypes1_14.ABSTRACT_ARROW)) {
                         if (type1_14.isOrHasParent(EntityTypes1_14.ABSTRACT_ARROW)) {

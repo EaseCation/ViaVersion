@@ -127,7 +127,7 @@ public final class WorldPacketRewriter1_17 {
             chunk.setChunkMask(BitSet.valueOf(new long[]{chunk.getBitmask()}));
 
             // Rewrite block state ids
-            blockRewriter.handleChunk(chunk);
+            blockRewriter.handleChunk(wrapper.user(), chunk);
         });
 
         blockRewriter.registerLevelEvent(ClientboundPackets1_16_2.LEVEL_EVENT, 1010, 2001);
@@ -153,7 +153,7 @@ public final class WorldPacketRewriter1_17 {
             for (int x = 0; x < 16; x++) {
                 for (int y = 0; y < 16; y++) {
                     for (int z = 0; z < 16; z++) {
-                        int blockStateId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), Protocol1_16_4To1_17.MAPPINGS, palette.idAt(x, y, z));
+                        int blockStateId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), Protocol1_16_4To1_17.class, Protocol1_16_4To1_17.MAPPINGS, palette.idAt(x, y, z));
                         blockChangeRecords[j++] = new BlockChangeRecord1_16_2(x, y, z, blockStateId);
                     }
                 }

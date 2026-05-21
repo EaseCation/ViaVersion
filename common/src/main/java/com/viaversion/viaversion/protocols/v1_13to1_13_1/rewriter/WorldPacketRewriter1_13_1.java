@@ -36,7 +36,7 @@ public class WorldPacketRewriter1_13_1 {
             ClientWorld clientWorld = wrapper.user().getClientWorld(Protocol1_13To1_13_1.class);
             Chunk chunk = wrapper.passthrough(ChunkType1_13.forEnvironment(clientWorld.getEnvironment()));
 
-            blockRewriter.handleChunk(chunk);
+            blockRewriter.handleChunk(wrapper.user(), chunk);
         });
 
         blockRewriter.registerBlockEvent(ClientboundPackets1_13.BLOCK_EVENT);
@@ -77,7 +77,7 @@ public class WorldPacketRewriter1_13_1 {
                     } else if (id == 1010) { // Play record
                         wrapper.set(Types.INT, 1, protocol.getMappingData().getNewItemId(wrapper.get(Types.INT, 1)));
                     } else if (id == 2001) { // Block break + block break sound
-                        wrapper.set(Types.INT, 1, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), wrapper.get(Types.INT, 1)));
+                        wrapper.set(Types.INT, 1, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), wrapper.get(Types.INT, 1)));
                     }
                 });
             }

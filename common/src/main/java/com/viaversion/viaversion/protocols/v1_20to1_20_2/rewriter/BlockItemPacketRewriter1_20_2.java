@@ -90,19 +90,24 @@ public final class BlockItemPacketRewriter1_20_2 extends ItemRewriter<Clientboun
 
         protocol.registerClientbound(ClientboundPackets1_19_4.BLOCK_ENTITY_DATA, wrapper -> {
             wrapper.passthrough(Types.BLOCK_POSITION1_14); // Position
-            wrapper.passthrough(Types.VAR_INT); // Type
+            final int mappedTypeId = CustomRegistryStorage.mappedBlockEntityTypeId(wrapper.user(), protocol, protocol.getMappingData().getBlockEntityMappings(), wrapper.read(Types.VAR_INT));
+            if (mappedTypeId == -1) {
+                wrapper.cancel();
+                return;
+            }
+            wrapper.write(Types.VAR_INT, mappedTypeId); // Type
             wrapper.write(Types.TRUSTED_COMPOUND_TAG, handleBlockEntity(wrapper.read(Types.NAMED_COMPOUND_TAG)));
         });
 
         protocol.registerClientbound(ClientboundPackets1_19_4.LEVEL_CHUNK_WITH_LIGHT, wrapper -> {
             final EntityTracker tracker = protocol.getEntityRewriter().tracker(wrapper.user());
             final Type<Chunk> chunkType = new ChunkType1_18(tracker.currentWorldSectionHeight(),
-                MathUtil.ceilLog2(protocol.getMappingData().getBlockStateMappings().size()),
+                MathUtil.ceilLog2(inputGlobalPaletteBlockSize(wrapper.user(), protocol.getMappingData().getBlockStateMappings().size())),
                 MathUtil.ceilLog2(tracker.biomesSent()));
             final Chunk chunk = wrapper.read(chunkType);
 
             final Type<Chunk> newChunkType = new ChunkType1_20_2(tracker.currentWorldSectionHeight(),
-                MathUtil.ceilLog2(protocol.getMappingData().getBlockStateMappings().mappedSize()),
+                MathUtil.ceilLog2(outputGlobalPaletteBlockSize(wrapper.user(), protocol.getMappingData().getBlockStateMappings().mappedSize())),
                 MathUtil.ceilLog2(tracker.biomesSent()));
             wrapper.write(newChunkType, chunk);
 
@@ -110,11 +115,20 @@ public final class BlockItemPacketRewriter1_20_2 extends ItemRewriter<Clientboun
                 final DataPalette blockPalette = section.palette(PaletteType.BLOCKS);
                 for (int i = 0; i < blockPalette.size(); i++) {
                     final int id = blockPalette.idByIndex(i);
-                    blockPalette.setIdByIndex(i, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), id));
+                    blockPalette.setIdByIndex(i, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), id));
                 }
             }
 
-            for (final BlockEntity blockEntity : chunk.blockEntities()) {
+            for (int i = chunk.blockEntities().size() - 1; i >= 0; i--) {
+                final BlockEntity blockEntity = chunk.blockEntities().get(i);
+                final int mappedTypeId = CustomRegistryStorage.mappedBlockEntityTypeId(wrapper.user(), protocol, protocol.getMappingData().getBlockEntityMappings(), blockEntity.typeId());
+                if (mappedTypeId == -1) {
+                    chunk.blockEntities().remove(i);
+                    continue;
+                }
+                if (mappedTypeId != blockEntity.typeId()) {
+                    chunk.blockEntities().set(i, blockEntity.withTypeId(mappedTypeId));
+                }
                 handleBlockEntity(blockEntity.tag());
             }
         });
@@ -283,5 +297,21 @@ public final class BlockItemPacketRewriter1_20_2 extends ItemRewriter<Clientboun
             tag.put("secondary_effect", new StringTag(PotionEffects1_20_2.idToKeyOrLuck(((NumberTag) secondaryEffect).asInt() - 1)));
         }
         return tag;
+    }
+
+    private int inputGlobalPaletteBlockSize(final UserConnection connection, final int vanillaSize) {
+        final CustomRegistryStorage registries = connection.get(CustomRegistryStorage.class);
+        if (registries == null || !registries.hasRegistry(CustomRegistryStorage.BLOCK_STATE)) {
+            return vanillaSize;
+        }
+        return Math.max(vanillaSize, registries.maxSourceId(protocol.getClass(), CustomRegistryStorage.BLOCK_STATE) + 1);
+    }
+
+    private int outputGlobalPaletteBlockSize(final UserConnection connection, final int vanillaSize) {
+        final CustomRegistryStorage registries = connection.get(CustomRegistryStorage.class);
+        if (registries == null || !registries.hasRegistry(CustomRegistryStorage.BLOCK_STATE)) {
+            return vanillaSize;
+        }
+        return Math.max(vanillaSize, registries.maxTargetId(protocol.getClass(), CustomRegistryStorage.BLOCK_STATE) + 1);
     }
 }

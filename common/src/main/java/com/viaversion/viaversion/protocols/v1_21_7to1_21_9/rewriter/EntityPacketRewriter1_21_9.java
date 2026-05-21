@@ -67,7 +67,7 @@ public final class EntityPacketRewriter1_21_9 extends EntityRewriter<Clientbound
             final int data = wrapper.passthrough(Types.VAR_INT);
             final EntityType entityType = trackAndRewrite(wrapper, entityTypeId, entityId);
             if (protocol.getMappingData() != null && entityType == EntityTypes1_21_9.FALLING_BLOCK) {
-                final int mappedBlockStateId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data);
+                final int mappedBlockStateId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), data);
                 wrapper.set(Types.VAR_INT, 2, mappedBlockStateId);
             }
 

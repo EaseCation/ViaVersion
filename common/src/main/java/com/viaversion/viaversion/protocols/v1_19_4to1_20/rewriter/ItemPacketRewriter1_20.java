@@ -124,7 +124,7 @@ public final class ItemPacketRewriter1_20 extends ItemRewriter<ClientboundPacket
                 read(Types.BOOLEAN); // Suppress light updates
                 handler(wrapper -> {
                     for (final BlockChangeRecord record : wrapper.passthrough(Types.VAR_LONG_BLOCK_CHANGE_ARRAY)) {
-                        record.setBlockId(CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), record.getBlockId()));
+                        record.setBlockId(CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), record.getBlockId()));
                     }
                 });
             }

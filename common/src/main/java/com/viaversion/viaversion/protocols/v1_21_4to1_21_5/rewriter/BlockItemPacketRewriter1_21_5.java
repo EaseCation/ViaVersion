@@ -53,6 +53,7 @@ import com.viaversion.viaversion.api.minecraft.item.data.TooltipDisplay;
 import com.viaversion.viaversion.api.minecraft.item.data.TropicalFishPattern;
 import com.viaversion.viaversion.api.minecraft.item.data.Unbreakable;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
 import com.viaversion.viaversion.api.rewriter.ComponentRewriter;
 import com.viaversion.viaversion.api.type.Type;
@@ -127,11 +128,12 @@ public final class BlockItemPacketRewriter1_21_5 extends StructuredItemRewriter<
         protocol.registerClientbound(ClientboundPackets1_21_2.LEVEL_CHUNK_WITH_LIGHT, wrapper -> {
             final EntityTracker tracker = protocol.getEntityRewriter().tracker(wrapper.user());
             final Mappings blockStateMappings = protocol.getMappingData().getBlockStateMappings();
-            final Type<Chunk> chunkType = new ChunkType1_20_2(tracker.currentWorldSectionHeight(), ceilLog2(blockStateMappings.size()), ceilLog2(tracker.biomesSent()));
+            final int biomeBits = ceilLog2(tracker.biomesSent());
+            final Type<Chunk> chunkType = new ChunkType1_20_2(tracker.currentWorldSectionHeight(), ceilLog2(inputGlobalPaletteBlockSize(wrapper.user(), blockStateMappings.size())), biomeBits);
             final Chunk chunk = wrapper.read(chunkType);
-            blockRewriter.handleChunk(chunk);
+            blockRewriter.handleChunk(wrapper.user(), chunk);
 
-            final Type<Chunk> newChunkType = new ChunkType1_21_5(tracker.currentWorldSectionHeight(), ceilLog2(blockStateMappings.mappedSize()), ceilLog2(tracker.biomesSent()));
+            final Type<Chunk> newChunkType = new ChunkType1_21_5(tracker.currentWorldSectionHeight(), ceilLog2(outputGlobalPaletteBlockSize(wrapper.user(), blockStateMappings.mappedSize())), biomeBits);
             final List<Heightmap> heightmaps = new ArrayList<>();
             for (final Map.Entry<String, Tag> entry : chunk.getHeightMap().entrySet()) {
                 final int type = heightmapType(entry.getKey());
@@ -295,6 +297,22 @@ public final class BlockItemPacketRewriter1_21_5 extends StructuredItemRewriter<
             case "MOTION_BLOCKING_NO_LEAVES" -> 5;
             default -> -1;
         };
+    }
+
+    private int inputGlobalPaletteBlockSize(final UserConnection connection, final int vanillaSize) {
+        final CustomRegistryStorage registries = connection.get(CustomRegistryStorage.class);
+        if (registries == null || !registries.hasRegistry(CustomRegistryStorage.BLOCK_STATE)) {
+            return vanillaSize;
+        }
+        return Math.max(vanillaSize, registries.maxSourceId(protocol.getClass(), CustomRegistryStorage.BLOCK_STATE) + 1);
+    }
+
+    private int outputGlobalPaletteBlockSize(final UserConnection connection, final int vanillaSize) {
+        final CustomRegistryStorage registries = connection.get(CustomRegistryStorage.class);
+        if (registries == null || !registries.hasRegistry(CustomRegistryStorage.BLOCK_STATE)) {
+            return vanillaSize;
+        }
+        return Math.max(vanillaSize, registries.maxTargetId(protocol.getClass(), CustomRegistryStorage.BLOCK_STATE) + 1);
     }
 
     @Override

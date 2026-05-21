@@ -84,7 +84,7 @@ public final class EntityPacketRewriter1_19 extends EntityRewriter<ClientboundPa
                     final int entityId = wrapper.get(Types.VAR_INT, 0);
                     final EntityType entityType = tracker(wrapper.user()).entityType(entityId);
                     if (entityType == EntityTypes1_19.FALLING_BLOCK) {
-                        wrapper.set(Types.VAR_INT, 2, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), wrapper.get(Types.VAR_INT, 2)));
+                        wrapper.set(Types.VAR_INT, 2, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), wrapper.get(Types.VAR_INT, 2)));
                     }
                 });
             }

@@ -63,7 +63,7 @@ public final class ItemPacketRewriter1_19_4 extends ItemRewriter<ClientboundPack
                             wrapper.set(Types.INT, 1, 0);
                         }
                     } else if (id == 2001) { // Block break + block break sound
-                        wrapper.set(Types.INT, 1, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data));
+                        wrapper.set(Types.INT, 1, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), data));
                     }
                 });
             }

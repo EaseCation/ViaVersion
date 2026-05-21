@@ -21,6 +21,7 @@ import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.nbt.tag.NumberTag;
 import com.viaversion.nbt.tag.StringTag;
 import com.viaversion.viaversion.api.Via;
+import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.data.entity.EntityTracker;
 import com.viaversion.viaversion.api.minecraft.blockentity.BlockEntity;
 import com.viaversion.viaversion.api.minecraft.blockentity.BlockEntityImpl;
@@ -28,9 +29,11 @@ import com.viaversion.viaversion.api.minecraft.chunks.Chunk;
 import com.viaversion.viaversion.api.minecraft.chunks.Chunk1_18;
 import com.viaversion.viaversion.api.minecraft.chunks.ChunkSection;
 import com.viaversion.viaversion.api.minecraft.chunks.ChunkSectionImpl;
+import com.viaversion.viaversion.api.minecraft.chunks.DataPalette;
 import com.viaversion.viaversion.api.minecraft.chunks.DataPaletteImpl;
 import com.viaversion.viaversion.api.minecraft.chunks.PaletteType;
 import com.viaversion.viaversion.api.protocol.remapper.PacketHandlers;
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.api.type.types.chunk.ChunkType1_17;
 import com.viaversion.viaversion.api.type.types.chunk.ChunkType1_18;
@@ -40,6 +43,7 @@ import com.viaversion.viaversion.protocols.v1_17_1to1_18.data.BlockEntityMapping
 import com.viaversion.viaversion.protocols.v1_17_1to1_18.packet.ClientboundPackets1_18;
 import com.viaversion.viaversion.protocols.v1_17_1to1_18.storage.ChunkLightStorage;
 import com.viaversion.viaversion.protocols.v1_17to1_17_1.packet.ClientboundPackets1_17_1;
+import com.viaversion.viaversion.rewriter.BlockRewriter;
 import com.viaversion.viaversion.util.Key;
 import com.viaversion.viaversion.util.MathUtil;
 import java.util.ArrayList;
@@ -49,6 +53,10 @@ import java.util.List;
 public final class WorldPacketRewriter1_18 {
 
     public static void register(final Protocol1_17_1To1_18 protocol) {
+        final BlockRewriter<ClientboundPackets1_17_1> blockRewriter = BlockRewriter.for1_14(protocol);
+        blockRewriter.registerBlockUpdate(ClientboundPackets1_17_1.BLOCK_UPDATE);
+        blockRewriter.registerSectionBlocksUpdate(ClientboundPackets1_17_1.SECTION_BLOCKS_UPDATE);
+
         protocol.registerClientbound(ClientboundPackets1_17_1.BLOCK_ENTITY_DATA, new PacketHandlers() {
             @Override
             public void register() {
@@ -153,11 +161,17 @@ public final class WorldPacketRewriter1_18 {
                     final int biome = biomeData[biomeArrayIndex];
                     biomePalette.setIdAt(biomeIndex, biome != -1 ? biome : 0);
                 }
+
+                final DataPalette blockPalette = section.palette(PaletteType.BLOCKS);
+                for (int paletteIndex = 0; paletteIndex < blockPalette.size(); paletteIndex++) {
+                    final int id = blockPalette.idByIndex(paletteIndex);
+                    blockPalette.setIdByIndex(paletteIndex, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), id));
+                }
             }
 
             final Chunk chunk = new Chunk1_18(oldChunk.getX(), oldChunk.getZ(), sections, oldChunk.getHeightMap(), blockEntities);
             wrapper.write(new ChunkType1_18(tracker.currentWorldSectionHeight(),
-                MathUtil.ceilLog2(protocol.getMappingData().getBlockStateMappings().mappedSize()),
+                MathUtil.ceilLog2(outputGlobalPaletteBlockSize(wrapper.user(), protocol.getMappingData().getBlockStateMappings().mappedSize())),
                 MathUtil.ceilLog2(tracker.biomesSent())), chunk);
 
             final ChunkLightStorage lightStorage = wrapper.user().get(ChunkLightStorage.class);
@@ -201,6 +215,14 @@ public final class WorldPacketRewriter1_18 {
             final int chunkZ = wrapper.passthrough(Types.INT);
             wrapper.user().get(ChunkLightStorage.class).clear(chunkX, chunkZ);
         });
+    }
+
+    private static int outputGlobalPaletteBlockSize(final UserConnection connection, final int vanillaSize) {
+        final CustomRegistryStorage registries = connection.get(CustomRegistryStorage.class);
+        if (registries == null || !registries.hasRegistry(CustomRegistryStorage.BLOCK_STATE)) {
+            return vanillaSize;
+        }
+        return Math.max(vanillaSize, registries.maxTargetId(Protocol1_17_1To1_18.class, CustomRegistryStorage.BLOCK_STATE) + 1);
     }
 
     private static void handleSpawners(int typeId, final CompoundTag tag) {

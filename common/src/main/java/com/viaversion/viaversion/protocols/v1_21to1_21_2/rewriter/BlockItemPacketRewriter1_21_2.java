@@ -48,6 +48,7 @@ import com.viaversion.viaversion.api.minecraft.item.data.Instrument1_21_2;
 import com.viaversion.viaversion.api.minecraft.item.data.LockCode;
 import com.viaversion.viaversion.api.minecraft.item.data.PotionEffect;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.api.type.types.chunk.ChunkType1_20_2;
 import com.viaversion.viaversion.api.type.types.version.VersionedTypes;
@@ -371,15 +372,15 @@ public final class BlockItemPacketRewriter1_21_2 extends StructuredItemRewriter<
         protocol.registerClientbound(ClientboundPackets1_21.LEVEL_CHUNK_WITH_LIGHT, wrapper -> {
             final Chunk chunk = blockRewriter.handleChunk1_19(wrapper, ChunkType1_20_2::new);
             final Mappings blockEntityMappings = protocol.getMappingData().getBlockEntityMappings();
-            if (blockEntityMappings != null) {
-                final List<BlockEntity> blockEntities = chunk.blockEntities();
-                for (int i = 0; i < blockEntities.size(); i++) {
-                    final BlockEntity blockEntity = blockEntities.get(i);
-                    final int id = blockEntity.typeId();
-                    final int mappedId = blockEntityMappings.getNewIdOrDefault(id, id);
-                    if (id != mappedId) {
-                        blockEntities.set(i, blockEntity.withTypeId(mappedId));
-                    }
+            final List<BlockEntity> blockEntities = chunk.blockEntities();
+            for (int i = blockEntities.size() - 1; i >= 0; i--) {
+                final BlockEntity blockEntity = blockEntities.get(i);
+                final int id = blockEntity.typeId();
+                final int mappedId = CustomRegistryStorage.mappedBlockEntityTypeId(wrapper.user(), protocol, blockEntityMappings, id);
+                if (mappedId == -1) {
+                    blockEntities.remove(i);
+                } else if (id != mappedId) {
+                    blockEntities.set(i, blockEntity.withTypeId(mappedId));
                 }
             }
 

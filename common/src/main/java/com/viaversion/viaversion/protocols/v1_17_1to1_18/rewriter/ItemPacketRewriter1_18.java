@@ -53,6 +53,8 @@ public final class ItemPacketRewriter1_18 extends ItemRewriter<ClientboundPacket
                     int data = wrapper.get(Types.INT, 1);
                     if (id == 1010) { // Play record
                         wrapper.set(Types.INT, 1, protocol.getMappingData().getNewItemId(data));
+                    } else if (id == 2001) { // Block break + block break sound
+                        wrapper.set(Types.INT, 1, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), data));
                     }
                 });
             }
@@ -85,7 +87,7 @@ public final class ItemPacketRewriter1_18 extends ItemRewriter<ClientboundPacket
                     ParticleMappings mappings = protocol.getMappingData().getParticleMappings();
                     if (mappings.isBlockParticle(id)) {
                         int data = wrapper.passthrough(Types.VAR_INT);
-                        wrapper.set(Types.VAR_INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data));
+                        wrapper.set(Types.VAR_INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), data));
                     } else if (mappings.isItemParticle(id)) {
                         handleItemToClient(wrapper.user(), wrapper.passthrough(Types.ITEM1_13_2));
                     }

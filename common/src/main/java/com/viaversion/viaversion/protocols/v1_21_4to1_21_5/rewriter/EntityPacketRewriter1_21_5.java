@@ -232,7 +232,7 @@ public final class EntityPacketRewriter1_21_5 extends EntityRewriter<Clientbound
         // Minecarts finally have the block state data type
         filter().type(EntityTypes1_21_5.ABSTRACT_MINECART).index(11).handler((event, data) -> {
             final int state = (int) data.getValue();
-            final int mappedBlockState = CustomRegistryStorage.mappedBlockStateId(event.user(), protocol.getMappingData(), state);
+            final int mappedBlockState = CustomRegistryStorage.mappedBlockStateId(event.user(), protocol, protocol.getMappingData(), state);
             if (mappedBlockState == 0) {
                 event.cancel();
                 return;

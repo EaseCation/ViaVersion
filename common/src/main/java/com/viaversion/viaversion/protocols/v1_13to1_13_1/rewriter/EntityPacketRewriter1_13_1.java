@@ -88,7 +88,7 @@ public class EntityPacketRewriter1_13_1 extends EntityRewriter<ClientboundPacket
 
                     if (entType != null) {
                         if (entType.is(EntityTypes1_13.EntityType.FALLING_BLOCK)) {
-                            wrapper.set(Types.INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data));
+                            wrapper.set(Types.INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), data));
                         }
                         // Register Type ID
                         wrapper.user().getEntityTracker(Protocol1_13To1_13_1.class).addEntity(entityId, entType);

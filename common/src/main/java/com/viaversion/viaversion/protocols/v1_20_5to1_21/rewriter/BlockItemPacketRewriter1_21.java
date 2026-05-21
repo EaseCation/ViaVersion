@@ -123,7 +123,7 @@ public final class BlockItemPacketRewriter1_21 extends StructuredItemRewriter<Cl
 
                 wrapper.write(Types.INT, jukeboxSong);
             } else if (id == 2001) {
-                wrapper.write(Types.INT, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data));
+                wrapper.write(Types.INT, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), data));
             } else {
                 wrapper.write(Types.INT, data);
             }

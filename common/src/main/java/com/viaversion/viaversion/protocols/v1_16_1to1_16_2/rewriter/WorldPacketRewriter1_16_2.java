@@ -63,7 +63,7 @@ public class WorldPacketRewriter1_16_2 {
                 }
 
                 // Absolute y -> relative chunk section y
-                int blockId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), record.getBlockId());
+                int blockId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), record.getBlockId());
                 list.add(new BlockChangeRecord1_16_2(record.getSectionX(), record.getSectionY(), record.getSectionZ(), blockId));
             }
 

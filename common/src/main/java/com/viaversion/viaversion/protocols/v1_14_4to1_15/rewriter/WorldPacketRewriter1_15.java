@@ -77,7 +77,7 @@ public final class WorldPacketRewriter1_15 {
                     int id = wrapper.get(Types.INT, 0);
                     if (id == 3 || id == 23) {
                         int data = wrapper.passthrough(Types.VAR_INT);
-                        wrapper.set(Types.VAR_INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data));
+                        wrapper.set(Types.VAR_INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), data));
                     } else if (id == 32) {
                         protocol.getItemRewriter().handleItemToClient(wrapper.user(), wrapper.passthrough(Types.ITEM1_13_2));
                     }

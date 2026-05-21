@@ -88,7 +88,7 @@ public class WorldPacketRewriter1_14 {
                 handler(wrapper -> {
                     int id = wrapper.get(Types.VAR_INT, 0);
 
-                    wrapper.set(Types.VAR_INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), id));
+                    wrapper.set(Types.VAR_INT, 0, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), id));
                 });
             }
         });
@@ -141,7 +141,7 @@ public class WorldPacketRewriter1_14 {
                 boolean hasBlock = false;
                 for (int i = 0; i < blocks.size(); i++) {
                     int old = blocks.idByIndex(i);
-                    int newId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), old);
+                    int newId = CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), old);
                     if (!hasBlock && newId != air && newId != voidAir && newId != caveAir) { // air, void_air, cave_air
                         hasBlock = true;
                     }
@@ -260,7 +260,7 @@ public class WorldPacketRewriter1_14 {
                     if (id == 1010) { // Play record
                         wrapper.set(Types.INT, 1, protocol.getMappingData().getNewItemId(data));
                     } else if (id == 2001) { // Block break + block break sound
-                        wrapper.set(Types.INT, 1, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol.getMappingData(), data));
+                        wrapper.set(Types.INT, 1, CustomRegistryStorage.mappedBlockStateId(wrapper.user(), protocol, protocol.getMappingData(), data));
                     }
                 });
             }
