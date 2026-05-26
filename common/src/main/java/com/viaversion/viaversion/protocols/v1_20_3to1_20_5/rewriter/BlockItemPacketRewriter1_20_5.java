@@ -79,7 +79,6 @@ import com.viaversion.viaversion.api.minecraft.item.data.WritableBook;
 import com.viaversion.viaversion.api.minecraft.item.data.WrittenBook;
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
 import com.viaversion.viaversion.api.type.Types;
-import com.viaversion.viaversion.api.type.types.chunk.ChunkType1_20_2;
 import com.viaversion.viaversion.api.type.types.version.Types1_20_3;
 import com.viaversion.viaversion.api.type.types.version.VersionedTypes;
 import com.viaversion.viaversion.protocols.v1_20_2to1_20_3.packet.ClientboundPacket1_20_3;
@@ -100,7 +99,6 @@ import com.viaversion.viaversion.protocols.v1_20_3to1_20_5.packet.ServerboundPac
 import com.viaversion.viaversion.protocols.v1_20_3to1_20_5.storage.ArmorTrimStorage;
 import com.viaversion.viaversion.protocols.v1_20_3to1_20_5.storage.BannerPatternStorage;
 import com.viaversion.viaversion.protocols.v1_20_3to1_20_5.storage.TagKeys;
-import com.viaversion.viaversion.rewriter.BlockRewriter;
 import com.viaversion.viaversion.rewriter.ItemRewriter;
 import com.viaversion.viaversion.util.ComponentUtil;
 import com.viaversion.viaversion.util.Either;
@@ -137,13 +135,8 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
 
     @Override
     public void registerPackets() {
-        final BlockRewriter<ClientboundPacket1_20_3> blockRewriter = BlockRewriter.for1_20_2(protocol);
-        blockRewriter.registerBlockEvent(ClientboundPackets1_20_3.BLOCK_EVENT);
-        blockRewriter.registerBlockUpdate(ClientboundPackets1_20_3.BLOCK_UPDATE);
-        blockRewriter.registerSectionBlocksUpdate1_20(ClientboundPackets1_20_3.SECTION_BLOCKS_UPDATE);
-        blockRewriter.registerLevelEvent(ClientboundPackets1_20_3.LEVEL_EVENT, 1010, 2001);
-        protocol.registerClientbound(ClientboundPackets1_20_3.LEVEL_CHUNK_WITH_LIGHT, wrapper -> {
-            final Chunk chunk = blockRewriter.handleChunk1_19(wrapper, ChunkType1_20_2::new);
+        protocol.replaceClientbound(ClientboundPackets1_20_3.LEVEL_CHUNK_WITH_LIGHT, wrapper -> {
+            final Chunk chunk = protocol.getBlockRewriter().handleChunk1_18(wrapper);
             for (int i = 0; i < chunk.blockEntities().size(); i++) {
                 BlockEntity blockEntity = chunk.blockEntities().get(i);
                 final int typeId = blockEntity.typeId();
@@ -161,7 +154,7 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
                 updateBlockEntityTag(wrapper.user(), null, blockEntity.tag());
             }
         });
-        protocol.registerClientbound(ClientboundPackets1_20_3.BLOCK_ENTITY_DATA, wrapper -> {
+        protocol.replaceClientbound(ClientboundPackets1_20_3.BLOCK_ENTITY_DATA, wrapper -> {
             wrapper.passthrough(Types.BLOCK_POSITION1_14); // Position
 
             final int typeId = wrapper.read(Types.VAR_INT);
@@ -182,13 +175,6 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
             wrapper.write(Types.TRUSTED_COMPOUND_TAG, tag);
         });
 
-        registerCooldown(ClientboundPackets1_20_3.COOLDOWN);
-        registerSetContent1_17_1(ClientboundPackets1_20_3.CONTAINER_SET_CONTENT);
-        registerSetSlot1_17_1(ClientboundPackets1_20_3.CONTAINER_SET_SLOT);
-        registerContainerClick1_17_1(ServerboundPackets1_20_5.CONTAINER_CLICK);
-        registerContainerSetData(ClientboundPackets1_20_3.CONTAINER_SET_DATA);
-        registerSetCreativeModeSlot(ServerboundPackets1_20_5.SET_CREATIVE_MODE_SLOT);
-
         protocol.registerServerbound(ServerboundPackets1_20_5.CONTAINER_BUTTON_CLICK, wrapper -> {
             final byte containerId = wrapper.read(Types.VAR_INT).byteValue();
             final byte buttonId = wrapper.read(Types.VAR_INT).byteValue();
@@ -196,7 +182,7 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
             wrapper.write(Types.BYTE, buttonId);
         });
 
-        protocol.registerClientbound(ClientboundPackets1_20_3.UPDATE_ADVANCEMENTS, wrapper -> {
+        protocol.replaceClientbound(ClientboundPackets1_20_3.UPDATE_ADVANCEMENTS, wrapper -> {
             wrapper.passthrough(Types.BOOLEAN); // Reset/clear
             int size = wrapper.passthrough(Types.VAR_INT); // Mapping size
             for (int i = 0; i < size; i++) {
@@ -229,7 +215,7 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
             }
         });
 
-        protocol.registerClientbound(ClientboundPackets1_20_3.LEVEL_PARTICLES, wrapper -> {
+        protocol.replaceClientbound(ClientboundPackets1_20_3.LEVEL_PARTICLES, wrapper -> {
             final int particleId = wrapper.read(Types.VAR_INT);
 
             wrapper.passthrough(Types.BOOLEAN); // Long Distance
@@ -326,7 +312,7 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
             wrapper.write(Types.SOUND_EVENT, Holder.of(new SoundEvent(sound, range)));
         });
 
-        protocol.registerClientbound(ClientboundPackets1_20_3.MERCHANT_OFFERS, wrapper -> {
+        protocol.replaceClientbound(ClientboundPackets1_20_3.MERCHANT_OFFERS, wrapper -> {
             wrapper.passthrough(Types.VAR_INT); // Container id
             final int size = wrapper.passthrough(Types.VAR_INT);
             for (int i = 0; i < size; i++) {
@@ -366,6 +352,15 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
                 wrapper.write(Types.VAR_INT, protocol.getMappingData().getRecipeSerializerMappings().mappedId(type));
                 recipeRewriter.handleRecipeType(wrapper, type);
             }
+        });
+
+        protocol.replaceServerbound(ServerboundPackets1_20_5.SET_CREATIVE_MODE_SLOT, wrapper -> {
+            if (!protocol.getEntityRewriter().tracker(wrapper.user()).canInstaBuild()) {
+                wrapper.cancel();
+                return;
+            }
+            wrapper.passthrough(Types.SHORT); // Slot
+            wrapper.write(itemType(), handleItemToServer(wrapper.user(), wrapper.read(mappedItemType())));
         });
     }
 
@@ -830,7 +825,7 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
             idLength = propertiesStartIndex;
         }
         if (tagStartIndex != -1) {
-            idLength = Math.min(propertiesStartIndex, tagStartIndex);
+            idLength = propertiesStartIndex != -1 ? Math.min(propertiesStartIndex, tagStartIndex) : tagStartIndex;
         }
 
         final String identifier = rawPredicate.substring(0, idLength);
@@ -1093,13 +1088,13 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
         final Fireworks fireworks = new Fireworks(
             flightDuration,
             explosionsTag != null ? explosionsTag.stream().limit(256).
-                map(this::readExplosion).toArray(FireworkExplosion[]::new) : new FireworkExplosion[0]
+                                    map(this::readExplosion).toArray(FireworkExplosion[]::new) : new FireworkExplosion[0]
         );
         data.set(StructuredDataKey.FIREWORKS, fireworks);
     }
 
     private void updateEffects(final ListTag<CompoundTag> effects, final StructuredDataContainer data) {
-        final SuspiciousStewEffect[] suspiciousStewEffects = new SuspiciousStewEffect[effects.size()];
+        final List<SuspiciousStewEffect> suspiciousStewEffects = new ArrayList<>();
         for (int i = 0; i < effects.size(); i++) {
             final CompoundTag effect = effects.get(i);
             final String effectIdString = effect.getString("id", "luck");
@@ -1110,10 +1105,10 @@ public final class BlockItemPacketRewriter1_20_5 extends ItemRewriter<Clientboun
                     effectId,
                     duration
                 );
-                suspiciousStewEffects[i] = stewEffect;
+                suspiciousStewEffects.add(stewEffect);
             }
         }
-        data.set(StructuredDataKey.SUSPICIOUS_STEW_EFFECTS, suspiciousStewEffects);
+        data.set(StructuredDataKey.SUSPICIOUS_STEW_EFFECTS, suspiciousStewEffects.toArray(SuspiciousStewEffect[]::new));
     }
 
     private void updateLodestoneTracker(final boolean tracked, final CompoundTag lodestonePosTag, final String lodestoneDimension, final StructuredDataContainer data) {

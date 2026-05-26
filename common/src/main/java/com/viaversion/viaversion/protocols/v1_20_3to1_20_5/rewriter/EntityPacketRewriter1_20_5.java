@@ -74,11 +74,9 @@ public final class EntityPacketRewriter1_20_5 extends EntityRewriter<Clientbound
 
     @Override
     public void registerPackets() {
-        registerTrackerWithData1_19(ClientboundPackets1_20_3.ADD_ENTITY, EntityTypes1_20_5.FALLING_BLOCK);
         registerSetEntityData(ClientboundPackets1_20_3.SET_ENTITY_DATA, Types1_20_3.ENTITY_DATA_LIST, VersionedTypes.V1_20_5.entityDataList);
-        registerRemoveEntities(ClientboundPackets1_20_3.REMOVE_ENTITIES);
 
-        protocol.registerClientbound(ClientboundPackets1_20_3.SET_EQUIPMENT, wrapper -> {
+        protocol.replaceClientbound(ClientboundPackets1_20_3.SET_EQUIPMENT, wrapper -> {
             final int entityId = wrapper.passthrough(Types.VAR_INT); // Entity id
             final EntityType type = tracker(wrapper.user()).entityType(entityId);
 
@@ -280,7 +278,9 @@ public final class EntityPacketRewriter1_20_5 extends EntityRewriter<Clientbound
                     storage.clear();
 
                     final byte gamemode = wrapper.get(Types.BYTE, 0);
-                    sendRangeAttributes(wrapper.user(), gamemode == GameMode.CREATIVE.id());
+                    final boolean creativeMode = gamemode == GameMode.CREATIVE.id();
+                    sendRangeAttributes(wrapper.user(), creativeMode);
+                    tracker(wrapper.user()).setInstaBuild(creativeMode);
                 });
             }
         });
@@ -295,7 +295,9 @@ public final class EntityPacketRewriter1_20_5 extends EntityRewriter<Clientbound
             wrapper.passthrough(Types.LONG); // Seed
 
             final byte gamemode = wrapper.passthrough(Types.BYTE);
-            sendRangeAttributes(wrapper.user(), gamemode == GameMode.CREATIVE.id());
+            final boolean creativeMode = gamemode == GameMode.CREATIVE.id();
+            sendRangeAttributes(wrapper.user(), creativeMode);
+            tracker(wrapper.user()).setInstaBuild(creativeMode);
 
             wrapper.user().put(new ScoreboardTeamStorage());
         });
@@ -340,7 +342,14 @@ public final class EntityPacketRewriter1_20_5 extends EntityRewriter<Clientbound
 
             // Resend attributes either with their original list or with the creative range modifier added
             final int value = (int) Math.floor(wrapper.passthrough(Types.FLOAT) + 0.5F);
-            sendRangeAttributes(wrapper.user(), value == GameMode.CREATIVE.id());
+            final boolean creativeMode = value == GameMode.CREATIVE.id();
+            sendRangeAttributes(wrapper.user(), creativeMode);
+            tracker(wrapper.user()).setInstaBuild(creativeMode);
+        });
+
+        protocol.registerClientbound(ClientboundPackets1_20_3.PLAYER_ABILITIES, wrapper -> {
+            final byte flags = wrapper.passthrough(Types.BYTE);
+            tracker(wrapper.user()).setInstaBuild((flags & 1 << 3) != 0);
         });
     }
 
@@ -557,11 +566,6 @@ public final class EntityPacketRewriter1_20_5 extends EntityRewriter<Clientbound
         if (particle.id() == protocol.getMappingData().getParticleMappings().mappedId("entity_effect")) {
             particle.getArgument(0).setValue(withAlpha(color));
         }
-    }
-
-    @Override
-    public void onMappingDataLoaded() {
-        mapTypes();
     }
 
     @Override

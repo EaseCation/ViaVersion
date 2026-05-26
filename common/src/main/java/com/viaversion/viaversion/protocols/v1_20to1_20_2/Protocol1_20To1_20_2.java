@@ -33,8 +33,6 @@ import com.viaversion.viaversion.api.protocol.packet.State;
 import com.viaversion.viaversion.api.protocol.remapper.PacketHandler;
 import com.viaversion.viaversion.api.protocol.remapper.PacketHandlers;
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
-import com.viaversion.viaversion.api.rewriter.EntityRewriter;
-import com.viaversion.viaversion.api.rewriter.ItemRewriter;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.data.entity.EntityTrackerBase;
 import com.viaversion.viaversion.exception.CancelException;
@@ -48,13 +46,14 @@ import com.viaversion.viaversion.protocols.v1_20to1_20_2.packet.ClientboundPacke
 import com.viaversion.viaversion.protocols.v1_20to1_20_2.packet.ServerboundConfigurationPackets1_20_2;
 import com.viaversion.viaversion.protocols.v1_20to1_20_2.packet.ServerboundPackets1_20_2;
 import com.viaversion.viaversion.protocols.v1_20to1_20_2.rewriter.BlockItemPacketRewriter1_20_2;
+import com.viaversion.viaversion.protocols.v1_20to1_20_2.rewriter.BlockRewriter1_20_2;
 import com.viaversion.viaversion.protocols.v1_20to1_20_2.rewriter.EntityPacketRewriter1_20_2;
 import com.viaversion.viaversion.protocols.v1_20to1_20_2.storage.ConfigurationState;
 import com.viaversion.viaversion.protocols.v1_20to1_20_2.storage.ConfigurationState.BridgePhase;
 import com.viaversion.viaversion.protocols.v1_20to1_20_2.storage.LastResourcePack;
 import com.viaversion.viaversion.protocols.v1_20to1_20_2.storage.LastTags;
+import com.viaversion.viaversion.rewriter.BlockRewriter;
 import com.viaversion.viaversion.rewriter.ParticleRewriter;
-import com.viaversion.viaversion.rewriter.SoundRewriter;
 import com.viaversion.viaversion.rewriter.TagRewriter;
 import com.viaversion.viaversion.util.Key;
 import java.util.UUID;
@@ -67,6 +66,7 @@ public final class Protocol1_20To1_20_2 extends AbstractProtocol<ClientboundPack
     private final BlockItemPacketRewriter1_20_2 itemPacketRewriter = new BlockItemPacketRewriter1_20_2(this);
     private final ParticleRewriter<ClientboundPackets1_19_4> particleRewriter = new ParticleRewriter<>(this);
     private final TagRewriter<ClientboundPackets1_19_4> tagRewriter = new TagRewriter<>(this);
+    private final BlockRewriter<ClientboundPackets1_19_4> blockRewriter = new BlockRewriter1_20_2(this);
 
     public Protocol1_20To1_20_2() {
         super(ClientboundPackets1_19_4.class, ClientboundPackets1_20_2.class, ServerboundPackets1_19_4.class, ServerboundPackets1_20_2.class);
@@ -76,12 +76,6 @@ public final class Protocol1_20To1_20_2 extends AbstractProtocol<ClientboundPack
     protected void registerPackets() {
         // Close your eyes and turn around while you still can
         super.registerPackets();
-
-        final SoundRewriter<ClientboundPackets1_19_4> soundRewriter = new SoundRewriter<>(this);
-        soundRewriter.registerSound1_19_3(ClientboundPackets1_19_4.SOUND);
-        soundRewriter.registerSound1_19_3(ClientboundPackets1_19_4.SOUND_ENTITY);
-
-        particleRewriter.registerLevelParticles1_19(ClientboundPackets1_19_4.LEVEL_PARTICLES);
 
         registerClientbound(ClientboundPackets1_19_4.CUSTOM_PAYLOAD, new PacketHandlers() {
             @Override
@@ -119,7 +113,7 @@ public final class Protocol1_20To1_20_2 extends AbstractProtocol<ClientboundPack
             wrapper.user().put(new LastResourcePack(url, hash, required, prompt));
         });
 
-        registerClientbound(ClientboundPackets1_19_4.UPDATE_TAGS, wrapper -> {
+        replaceClientbound(ClientboundPackets1_19_4.UPDATE_TAGS, wrapper -> {
             tagRewriter.handleGeneric(wrapper);
             wrapper.resetReader();
             wrapper.user().put(new LastTags(wrapper));
@@ -278,7 +272,7 @@ public final class Protocol1_20To1_20_2 extends AbstractProtocol<ClientboundPack
             }
 
             // Queue packets sent by the server while we wait for the client to transition to the configuration state
-            configurationBridge.addPacketToQueue(packetWrapper, true);
+            configurationBridge.addClientboundPacketToQueue(packetWrapper);
             throw CancelException.generate();
         }
 
@@ -301,7 +295,7 @@ public final class Protocol1_20To1_20_2 extends AbstractProtocol<ClientboundPack
                     }
                 }
 
-                configurationBridge.addPacketToQueue(packetWrapper, true);
+                configurationBridge.addClientboundPacketToQueue(packetWrapper);
                 throw CancelException.generate();
             }
 
@@ -321,7 +315,7 @@ public final class Protocol1_20To1_20_2 extends AbstractProtocol<ClientboundPack
             } else {
                 // Not a packet that can be mapped to the configuration protocol
                 // Includes resource pack packets to make sure it is not applied sooner than the server expects
-                configurationBridge.addPacketToQueue(packetWrapper, true);
+                configurationBridge.addClientboundPacketToQueue(packetWrapper);
                 throw CancelException.generate();
             }
             return;
@@ -344,13 +338,22 @@ public final class Protocol1_20To1_20_2 extends AbstractProtocol<ClientboundPack
         // The client includes vanilla as the default feature when initially leaving the login phase
 
         final LastTags lastTags = connection.get(LastTags.class);
+        boolean sentTags = false;
         if (lastTags != null) {
             if (lastTags.sentDuringConfigPhase()) {
                 lastTags.setSentDuringConfigPhase(false);
+                sentTags = true;
             } else {
                 // The server might still follow up with a tags packet, but we wouldn't know
-                lastTags.sendLastTags(connection);
+                sentTags = lastTags.sendLastTags(connection);
             }
+        }
+
+        if (!sentTags) {
+            // Send an empty tags packet to allow adding to it in later protocols
+            final PacketWrapper packet = PacketWrapper.create(ClientboundConfigurationPackets1_20_2.UPDATE_TAGS, connection);
+            packet.write(Types.VAR_INT, 0);
+            packet.send(Protocol1_20To1_20_2.class);
         }
 
         if (lastResourcePack != null && connection.getProtocolInfo().protocolVersion() == ProtocolVersion.v1_20_2) {
@@ -372,7 +375,7 @@ public final class Protocol1_20To1_20_2 extends AbstractProtocol<ClientboundPack
     private PacketHandler queueServerboundPacket(final ServerboundPackets1_20_2 packetType) {
         return wrapper -> {
             wrapper.setPacketType(packetType);
-            wrapper.user().get(ConfigurationState.class).addPacketToQueue(wrapper, false);
+            wrapper.user().get(ConfigurationState.class).addServerboundPacketToQueue(wrapper);
             wrapper.cancel();
         };
     }
@@ -383,24 +386,24 @@ public final class Protocol1_20To1_20_2 extends AbstractProtocol<ClientboundPack
     }
 
     @Override
-    protected void registerConfigurationChangeHandlers() {
-        // Don't handle it in the transitioning protocol
-    }
-
-    @Override
     public void init(final UserConnection user) {
         user.put(new ConfigurationState());
         addEntityTracker(user, new EntityTrackerBase(user, EntityTypes1_19_4.PLAYER));
     }
 
     @Override
-    public EntityRewriter<Protocol1_20To1_20_2> getEntityRewriter() {
+    public EntityPacketRewriter1_20_2 getEntityRewriter() {
         return entityPacketRewriter;
     }
 
     @Override
-    public ItemRewriter<Protocol1_20To1_20_2> getItemRewriter() {
+    public BlockItemPacketRewriter1_20_2 getItemRewriter() {
         return itemPacketRewriter;
+    }
+
+    @Override
+    public BlockRewriter<ClientboundPackets1_19_4> getBlockRewriter() {
+        return blockRewriter;
     }
 
     @Override

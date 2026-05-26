@@ -338,7 +338,10 @@ public class PacketWrapperImpl implements PacketWrapper {
 
         final ProtocolInfo protocolInfo = user().getProtocolInfo();
         final List<Protocol> protocols = protocolInfo.getPipeline().pipes(protocolClass, skipCurrentPipeline, direction);
-        apply(direction, protocolInfo.getState(direction), protocols);
+        // Use the packet's own state if known to avoid issues with stale tracked connection state
+        // (e.g. a previous protocol in the pipeline already having changed serverState to PLAY while still processing FINISH_CONFIGURATION)
+        final State state = this.packetType != null ? this.packetType.state() : protocolInfo.getState(direction);
+        apply(direction, state, protocols);
         final ByteBuf output = allocateOutputBuffer();
         try {
             writeToBuffer(output);
@@ -479,6 +482,19 @@ public class PacketWrapperImpl implements PacketWrapper {
     }
 
     @Override
+    public void rewindReader(final int values) {
+        if (allActionsRead) {
+            return;
+        }
+
+        final int size = packetValues.size();
+        Preconditions.checkArgument(values <= size, "Tried resetting more values than there are readable values");
+        for (int i = size - 1; i >= size - values; i--) {
+            this.readableObjects.addFirst(this.packetValues.remove(i));
+        }
+    }
+
+    @Override
     public void sendToServerRaw() throws InformativeException {
         sendToServerRaw(true);
     }
@@ -582,6 +598,17 @@ public class PacketWrapperImpl implements PacketWrapper {
 
     public void setAllActionsRead(final boolean allActionsRead) {
         this.allActionsRead = allActionsRead;
+    }
+
+    @Override
+    public void consumeReadsOnly(final Runnable runnable) {
+        final boolean previous = this.allActionsRead;
+        this.allActionsRead = true;
+        try {
+            runnable.run();
+        } finally {
+            this.allActionsRead = previous;
+        }
     }
 
     @Override

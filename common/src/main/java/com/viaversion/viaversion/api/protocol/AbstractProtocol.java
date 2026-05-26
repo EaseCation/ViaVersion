@@ -2,23 +2,18 @@
  * This file is part of ViaVersion - https://github.com/ViaVersion/ViaVersion
  * Copyright (C) 2016-2026 ViaVersion and contributors
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package com.viaversion.viaversion.api.protocol;
 
@@ -27,6 +22,7 @@ import com.viaversion.viaversion.api.Via;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.data.entity.EntityTracker;
 import com.viaversion.viaversion.api.data.item.ItemHasher;
+import com.viaversion.viaversion.api.minecraft.entities.EntityType;
 import com.viaversion.viaversion.api.protocol.packet.ClientboundPacketType;
 import com.viaversion.viaversion.api.protocol.packet.Direction;
 import com.viaversion.viaversion.api.protocol.packet.PacketType;
@@ -39,10 +35,17 @@ import com.viaversion.viaversion.api.protocol.packet.provider.PacketTypeMap;
 import com.viaversion.viaversion.api.protocol.packet.provider.PacketTypesProvider;
 import com.viaversion.viaversion.api.protocol.packet.provider.SimplePacketTypesProvider;
 import com.viaversion.viaversion.api.protocol.remapper.PacketHandler;
+import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
 import com.viaversion.viaversion.api.rewriter.MappingDataListener;
 import com.viaversion.viaversion.api.rewriter.Rewriter;
+import com.viaversion.viaversion.data.entity.EntityTrackerBase;
+import com.viaversion.viaversion.data.item.ItemHasherBase;
 import com.viaversion.viaversion.exception.CancelException;
 import com.viaversion.viaversion.exception.InformativeException;
+import com.viaversion.viaversion.protocol.shared_registration.SharedRegistrations;
+import com.viaversion.viaversion.rewriter.RecipeDisplayRewriter;
+import com.viaversion.viaversion.rewriter.TagRewriter;
+import com.viaversion.viaversion.rewriter.text.ComponentRewriterBase;
 import com.viaversion.viaversion.util.ProtocolLogger;
 import com.viaversion.viaversion.util.ProtocolUtil;
 import java.util.HashMap;
@@ -74,6 +77,8 @@ public abstract class AbstractProtocol<CU extends ClientboundPacketType, CM exte
     private final Map<Class<?>, Object> storedObjects = new HashMap<>();
     private boolean initialized;
     private ProtocolLogger logger;
+    private ProtocolVersion serverVersion;
+    private ProtocolVersion clientVersion;
 
     @Deprecated
     protected AbstractProtocol() {
@@ -104,8 +109,12 @@ public abstract class AbstractProtocol<CU extends ClientboundPacketType, CM exte
         if (logger == null) {
             logger = createLogger();
         }
+
+        // Apply shared registrations based on protocol version range
+        // Run before registerPackets, so implementations have to call append intentionally
+        applySharedRegistrations();
+
         registerPackets();
-        registerConfigurationChangeHandlers();
 
         // Register the rest of the ids with no handlers if necessary
         if (unmappedClientboundPacketType != null && mappedClientboundPacketType != null
@@ -128,33 +137,15 @@ public abstract class AbstractProtocol<CU extends ClientboundPacketType, CM exte
         }
     }
 
-    protected ProtocolLogger createLogger() {
-        return new ProtocolLogger(getClass());
+    /**
+     * Applies shared registrations. Can be overridden to remove or add registrations.
+     */
+    protected void applySharedRegistrations() {
+        SharedRegistrations.defaultRegistrations().applyMatching(this);
     }
 
-    protected void registerConfigurationChangeHandlers() {
-        // Register handlers for protocol state switching
-        // Assuming ids will change too often, it is cleaner to register them here instead of the base protocols,
-        // even if there will be multiple of these handlers
-        final SU configurationAcknowledgedPacket = configurationAcknowledgedPacket();
-        if (configurationAcknowledgedPacket != null) {
-            appendServerbound(configurationAcknowledgedPacket, setClientStateHandler(State.CONFIGURATION));
-        }
-
-        final CU startConfigurationPacket = startConfigurationPacket();
-        if (startConfigurationPacket != null) {
-            appendClientbound(startConfigurationPacket, startConfigurationHandler());
-        }
-
-        final SU finishConfigurationPacket = serverboundFinishConfigurationPacket();
-        if (finishConfigurationPacket != null) {
-            appendServerbound(finishConfigurationPacket, setClientStateHandler(State.PLAY));
-        }
-
-        final CU clientboundFinishConfigurationPacket = clientboundFinishConfigurationPacket();
-        if (clientboundFinishConfigurationPacket != null) {
-            appendClientbound(clientboundFinishConfigurationPacket, setServerStateHandler(State.PLAY));
-        }
+    protected ProtocolLogger createLogger() {
+        return new ProtocolLogger(getClass());
     }
 
     @Override
@@ -175,6 +166,20 @@ public abstract class AbstractProtocol<CU extends ClientboundPacketType, CM exte
         } else {
             registerServerbound(type, handler);
         }
+    }
+
+    @Override
+    public void replaceClientbound(final CU type, @Nullable final PacketHandler handler) {
+        final PacketMapping mapping = clientboundMappings.mappedPacket(type.state(), type.getId());
+        Preconditions.checkNotNull(mapping, "Packet %s has no handler to replace", type);
+        mapping.setHandler(handler);
+    }
+
+    @Override
+    public void replaceServerbound(final SU type, @Nullable final PacketHandler handler) {
+        final PacketMapping mapping = serverboundMappings.mappedPacket(type.state(), type.getId());
+        Preconditions.checkNotNull(mapping, "Packet %s has no handler to replace", type);
+        mapping.setHandler(handler);
     }
 
     private <U extends PacketType, M extends PacketType> void registerPacketIdChanges(
@@ -203,17 +208,10 @@ public abstract class AbstractProtocol<CU extends ClientboundPacketType, CM exte
         }
     }
 
-    public void registerFinishConfiguration(final CU packetType, final PacketHandler handler) {
-        registerClientbound(packetType, wrapper -> {
-            // TODO Temporary solution to handle the finish configuration packet already having changed our tracked protocol state in a previous handler
-            wrapper.user().getProtocolInfo().setServerState(State.CONFIGURATION);
-            handler.handle(wrapper);
-        });
-    }
-
     @Override
     public final void loadMappingData() {
         getMappingData().load();
+        initialize();
         onMappingDataLoaded();
     }
 
@@ -248,10 +246,21 @@ public abstract class AbstractProtocol<CU extends ClientboundPacketType, CM exte
         }
     }
 
+    protected void addEntityTracker(UserConnection connection) {
+        final EntityType playerEntityType = getEntityRewriter().typeFromId("player");
+        Preconditions.checkNotNull(playerEntityType, "Player entity type not found");
+        connection.addEntityTracker(this.getClass(), new EntityTrackerBase(connection, playerEntityType));
+    }
+
     protected void addEntityTracker(UserConnection connection, EntityTracker tracker) {
         connection.addEntityTracker(this.getClass(), tracker);
     }
 
+    protected void addItemHasher(UserConnection connection) {
+        connection.addItemHasher(this.getClass(), new ItemHasherBase(this, connection));
+    }
+
+    @Deprecated(forRemoval = true)
     protected void addItemHasher(UserConnection connection, ItemHasher hasher) {
         connection.addItemHasher(this.getClass(), hasher);
     }
@@ -273,20 +282,44 @@ public abstract class AbstractProtocol<CU extends ClientboundPacketType, CM exte
         return PacketMappings.arrayMappings();
     }
 
-    protected @Nullable SU configurationAcknowledgedPacket() {
-        return packetTypesProvider.unmappedServerboundType(State.PLAY, "CONFIGURATION_ACKNOWLEDGED");
+    /**
+     * Returns the server protocol version for this protocol,
+     * or null if not set (e.g. for base protocols).
+     *
+     * @return the server protocol version
+     */
+    public @Nullable ProtocolVersion getServerVersion() {
+        return serverVersion;
     }
 
-    protected @Nullable CU startConfigurationPacket() {
-        return packetTypesProvider.unmappedClientboundType(State.PLAY, "START_CONFIGURATION");
+    /**
+     * Sets the server protocol version for this protocol.
+     * Called by the protocol manager before {@link #initialize()}.
+     *
+     * @param serverVersion the server protocol version
+     */
+    public void setServerVersion(final ProtocolVersion serverVersion) {
+        this.serverVersion = serverVersion;
     }
 
-    protected @Nullable SU serverboundFinishConfigurationPacket() {
-        return packetTypesProvider.unmappedServerboundType(State.CONFIGURATION, "FINISH_CONFIGURATION");
+    /**
+     * Returns the client protocol version for this protocol,
+     * or null if not set (e.g. for base protocols).
+     *
+     * @return the client protocol version for this protocol
+     */
+    public @Nullable ProtocolVersion getClientVersion() {
+        return clientVersion;
     }
 
-    protected @Nullable CU clientboundFinishConfigurationPacket() {
-        return packetTypesProvider.unmappedClientboundType(State.CONFIGURATION, "FINISH_CONFIGURATION");
+    /**
+     * Sets the client protocol version for this protocol.
+     * Called by the protocol manager before {@link #initialize()}.
+     *
+     * @param clientVersion the client protocol version for this protocol
+     */
+    public void setClientVersion(final ProtocolVersion clientVersion) {
+        this.clientVersion = clientVersion;
     }
 
     // ---------------------------------------------------------------------------------
@@ -297,7 +330,7 @@ public abstract class AbstractProtocol<CU extends ClientboundPacketType, CM exte
         PacketMapping packetMapping = PacketMapping.of(mappedPacketId, handler);
         if (!override && serverboundMappings.hasMapping(state, unmappedPacketId)) {
             Via.getPlatform().getLogger().log(Level.WARNING, unmappedPacketId + " already registered!" +
-                " If this override is intentional, set override to true. Stacktrace: ", new Exception());
+                " If this override is intentional, use replaceServerbound instead. Stacktrace: ", new Exception());
         }
         serverboundMappings.addMapping(state, unmappedPacketId, packetMapping);
     }
@@ -313,7 +346,7 @@ public abstract class AbstractProtocol<CU extends ClientboundPacketType, CM exte
         PacketMapping packetMapping = PacketMapping.of(mappedPacketId, handler);
         if (!override && clientboundMappings.hasMapping(state, unmappedPacketId)) {
             Via.getPlatform().getLogger().log(Level.WARNING, unmappedPacketId + " already registered!" +
-                " If override is intentional, set override to true. Stacktrace: ", new Exception());
+                " If override is intentional, use replaceClientbound instead. Stacktrace: ", new Exception());
         }
         clientboundMappings.addMapping(state, unmappedPacketId, packetMapping);
     }
@@ -373,8 +406,8 @@ public abstract class AbstractProtocol<CU extends ClientboundPacketType, CM exte
 
         PacketMapping packetMapping = PacketMapping.of(mappedPacketType, handler);
         if (!override && packetMappings.hasMapping(packetType)) {
-            getLogger().log(Level.WARNING, packetType + " already registered!" +
-                " If override is intentional, set override to true. Stacktrace: ", new Exception());
+            throw new IllegalArgumentException("Packet type " + packetType + " already registered! If override is intentional, use "
+                + (packetType.direction() == Direction.SERVERBOUND ? "replaceServerbound" : "replaceClientbound") + " instead.");
         }
         packetMappings.addMapping(packetType, packetMapping);
     }
@@ -443,6 +476,14 @@ public abstract class AbstractProtocol<CU extends ClientboundPacketType, CM exte
         return logger;
     }
 
+    public com.viaversion.viaversion.rewriter.@Nullable BlockRewriter<CU> getBlockRewriter() {
+        return null;
+    }
+
+    public @Nullable RecipeDisplayRewriter<CU> getRecipeRewriter() {
+        return null;
+    }
+
     private void printRemapError(Direction direction, State state, int unmappedPacketId, int mappedPacketId, InformativeException e) {
         // Don't print errors during handshake/login/status
         if (state != State.PLAY && direction == Direction.SERVERBOUND && !Via.getManager().debugHandler().enabled()) {
@@ -472,23 +513,6 @@ public abstract class AbstractProtocol<CU extends ClientboundPacketType, CM exte
         }
     }
 
-    private PacketHandler setClientStateHandler(final State state) {
-        return wrapper -> wrapper.user().getProtocolInfo().setClientState(state);
-    }
-
-    private PacketHandler setServerStateHandler(final State state) {
-        return wrapper -> wrapper.user().getProtocolInfo().setServerState(state);
-    }
-
-    private PacketHandler startConfigurationHandler() {
-        return setServerStateHandler(State.CONFIGURATION).then(wrapper -> {
-            // Mimic client behaviour
-            final EntityTracker tracker = wrapper.user().getEntityTracker(getClass());
-            if (tracker != null) {
-                tracker.clear();
-            }
-        });
-    }
 
     @Override
     public final PacketTypesProvider<CU, CM, SM, SU> getPacketTypesProvider() {

@@ -34,15 +34,13 @@ import com.viaversion.viaversion.codec.CodecRegistryContext;
 import com.viaversion.viaversion.codec.hash.HashFunction;
 import com.viaversion.viaversion.codec.hash.HashOps;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 public class ItemHasherBase implements ItemHasher {
 
     public static int UNKNOWN_HASH = 399825415; // some random-ish number, from hashing Integer.MIN_VALUE+1 with crc32c
-    private final Map<Integer, HashedItem> hashes = CacheBuilder.newBuilder().concurrencyLevel(1).maximumSize(1024).<Integer, HashedItem>build().asMap();
+    private final Map<Integer, OriginalHashedItem> hashes = CacheBuilder.newBuilder().concurrencyLevel(1).maximumSize(1024).<Integer, OriginalHashedItem>build().asMap();
     protected final UserConnection connection;
     private boolean processingClientboundInventoryPacket;
     private final CodecContext context;
@@ -58,7 +56,7 @@ public class ItemHasherBase implements ItemHasher {
     /**
      * Returns the hashed item for the given item. Not all data may be successfully hashed.
      *
-     * @param item the item to hash
+     * @param item   the item to hash
      * @param mapped whether the item is mapped to the client version
      * @return the hashed item
      */
@@ -83,25 +81,26 @@ public class ItemHasherBase implements ItemHasher {
     /**
      * Tracks the data for the given data container, storing the original hashes via the now transformed data hashes.
      *
-     * @param customData custom_data tag
+     * @param customData         custom_data tag
      * @param originalHashedItem the original (pre-transformed) hashed item
+     * @param backupTagName      protocol-specific backup tag name where the item should become a regular hashed item again
      */
-    public void trackOriginalHashedItem(final CompoundTag customData, final HashedItem originalHashedItem) {
+    public void trackOriginalHashedItem(final CompoundTag customData, final HashedItem originalHashedItem, final String backupTagName) {
         // Store them via the custom_data hash, which includes the original data hashes.
         // Not perfect (as opposed to storing it by the full hashed item), but good enough. In the rare occasion there is a collision, we ignore it without issues.
         final int customDataHash = hashTag(customData);
-        this.hashes.put(customDataHash, originalHashedItem);
+        this.hashes.put(customDataHash, new OriginalHashedItem(originalHashedItem, backupTagName));
     }
 
     /**
      * Returns a copy of the original hashed item for a given custom_data hash.
      *
      * @param customDataHash custom_data hash
-     * @param clientItem the hashed item from the client that the original should be retrieved for
+     * @param clientItem     the hashed item from the client that the original should be retrieved for
      * @return the original hashed item, or null if not found
      */
-    public @Nullable HashedItem originalHashedItem(final int customDataHash, final HashedItem clientItem) {
-        HashedItem originalItem = this.hashes.get(customDataHash);
+    public @Nullable OriginalHashedItem originalHashedItem(final int customDataHash, final HashedItem clientItem) {
+        OriginalHashedItem originalItem = this.hashes.get(customDataHash);
         if (originalItem == null) {
             return null;
         }
@@ -116,6 +115,8 @@ public class ItemHasherBase implements ItemHasher {
                 entry.setValue(clientProvidedHash);
             }
         }
+
+        originalItem.setAmount(clientItem.amount());
         return originalItem;
     }
 
