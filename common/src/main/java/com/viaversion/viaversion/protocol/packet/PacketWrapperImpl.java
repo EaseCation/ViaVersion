@@ -24,6 +24,7 @@ import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.protocol.Protocol;
 import com.viaversion.viaversion.api.protocol.packet.Direction;
 import com.viaversion.viaversion.api.protocol.packet.PacketType;
+import com.viaversion.viaversion.api.protocol.packet.PacketSendInterceptor;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.protocol.packet.State;
 import com.viaversion.viaversion.api.protocol.remapper.PacketHandler;
@@ -303,6 +304,10 @@ public class PacketWrapperImpl implements PacketWrapper {
         if (isCancelled()) {
             return;
         }
+        final PacketSendInterceptor interceptor = user().get(PacketSendInterceptor.class);
+        if (interceptor != null && interceptor.interceptClientbound(this)) {
+            return;
+        }
 
         final UserConnection connection = user();
         if (currentThread) {
@@ -354,6 +359,10 @@ public class PacketWrapperImpl implements PacketWrapper {
     @Override
     public ChannelFuture sendFuture(Class<? extends Protocol> protocolClass) throws InformativeException {
         if (!isCancelled()) {
+            final PacketSendInterceptor interceptor = user().get(PacketSendInterceptor.class);
+            if (interceptor != null && interceptor.interceptClientbound(this)) {
+                return cancelledFuture();
+            }
             final ByteBuf output;
             try {
                 output = constructPacket(protocolClass, true, Direction.CLIENTBOUND);
