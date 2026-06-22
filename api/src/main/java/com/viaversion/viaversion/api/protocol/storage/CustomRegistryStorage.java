@@ -36,6 +36,7 @@ public final class CustomRegistryStorage implements StorableObject {
 
     public static final String BLOCK_ENTITY_TYPE = "minecraft:block_entity_type";
     public static final String BLOCK_STATE = "minecraft:block_state";
+    public static final String ITEM = "minecraft:item";
 
     private final Map<StageRegistryKey, RegistryOverlay> overlays = new HashMap<>();
 
@@ -98,9 +99,50 @@ public final class CustomRegistryStorage implements StorableObject {
         return identifier;
     }
 
+    public static int mappedItemIdToClient(final UserConnection connection, final Protocol stage, final MappingData mappingData, final int sourceId) {
+        return mappedItemIdToClient(connection, stage != null ? stage.getClass() : null, mappingData, sourceId);
+    }
+
+    public static int mappedItemIdToClient(final UserConnection connection, final @Nullable Class<? extends Protocol> stage, final MappingData mappingData, final int sourceId) {
+        final CustomRegistryStorage storage = connection.get(CustomRegistryStorage.class);
+        final int overlayId = storage != null ? storage.mappedId(stage, ITEM, sourceId) : -1;
+        if (overlayId == -1 && storage != null && storage.inSourceRange(ITEM, sourceId)) {
+            throw new IllegalStateException("Unknown custom source id " + sourceId + " for registry " + ITEM + " at stage " + stageKey(stage) + " while rewriting item raw id to client");
+        }
+        return overlayId != -1 ? overlayId : mappingData.getNewItemId(sourceId);
+    }
+
+    public static int mappedItemIdToServer(final UserConnection connection, final Protocol stage, final MappingData mappingData, final int targetId) {
+        return mappedItemIdToServer(connection, stage != null ? stage.getClass() : null, mappingData, targetId);
+    }
+
+    public static int mappedItemIdToServer(final UserConnection connection, final @Nullable Class<? extends Protocol> stage, final MappingData mappingData, final int targetId) {
+        final CustomRegistryStorage storage = connection.get(CustomRegistryStorage.class);
+        final int overlayId = storage != null ? storage.sourceId(stage, ITEM, targetId) : -1;
+        return overlayId != -1 ? overlayId : mappingData.getOldItemId(targetId);
+    }
+
+    public static @Nullable String mappedItemIdentifier(final UserConnection connection, final Protocol stage, final int sourceId) {
+        return mappedItemIdentifier(connection, stage != null ? stage.getClass() : null, sourceId);
+    }
+
+    public static @Nullable String mappedItemIdentifier(final UserConnection connection, final @Nullable Class<? extends Protocol> stage, final int sourceId) {
+        final CustomRegistryStorage storage = connection.get(CustomRegistryStorage.class);
+        final String identifier = storage != null ? storage.mappedIdentifier(stage, ITEM, sourceId) : null;
+        if (identifier == null && storage != null && storage.inSourceRange(ITEM, sourceId)) {
+            throw new IllegalStateException("Unknown custom source id " + sourceId + " for registry " + ITEM + " at stage " + stageKey(stage) + " while resolving item identifier");
+        }
+        return identifier;
+    }
+
     public int mappedId(final @Nullable Class<? extends Protocol> stage, final String registryKey, final int sourceId) {
         final RegistryOverlay overlay = overlays.get(new StageRegistryKey(stageKey(stage), registryKey));
         return overlay != null ? overlay.mappedId(sourceId) : -1;
+    }
+
+    public int sourceId(final @Nullable Class<? extends Protocol> stage, final String registryKey, final int targetId) {
+        final RegistryOverlay overlay = overlays.get(new StageRegistryKey(stageKey(stage), registryKey));
+        return overlay != null ? overlay.sourceId(targetId) : -1;
     }
 
     public @Nullable String mappedIdentifier(final @Nullable Class<? extends Protocol> stage, final String registryKey, final int sourceId) {
@@ -162,6 +204,7 @@ public final class CustomRegistryStorage implements StorableObject {
 
     private static final class RegistryOverlay {
         private final Map<Integer, Entry> mappings = new HashMap<>();
+        private final Map<Integer, Integer> sourceByTarget = new HashMap<>();
         private int minSourceId = Integer.MAX_VALUE;
         private int maxSourceId = -1;
         private int minAllocatedSourceId = Integer.MAX_VALUE;
@@ -182,6 +225,7 @@ public final class CustomRegistryStorage implements StorableObject {
 
         private void put(final int sourceId, final int targetId, final @Nullable String identifier) {
             mappings.put(sourceId, new Entry(targetId, identifier));
+            sourceByTarget.put(targetId, sourceId);
             if (sourceId > maxSourceId) {
                 maxSourceId = sourceId;
             }
@@ -196,6 +240,10 @@ public final class CustomRegistryStorage implements StorableObject {
         private int mappedId(final int sourceId) {
             final Entry entry = mappings.get(sourceId);
             return entry != null ? entry.targetId : -1;
+        }
+
+        private int sourceId(final int targetId) {
+            return sourceByTarget.getOrDefault(targetId, -1);
         }
 
         private @Nullable String mappedIdentifier(final int sourceId) {

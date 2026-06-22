@@ -31,6 +31,7 @@ import com.viaversion.viaversion.api.protocol.packet.ClientboundPacketType;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.protocol.packet.ServerboundPacketType;
 import com.viaversion.viaversion.api.protocol.remapper.PacketHandlers;
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.rewriter.ComponentRewriter;
 import com.viaversion.viaversion.api.rewriter.RewriterBase;
 import com.viaversion.viaversion.api.type.Type;
@@ -94,8 +95,9 @@ public class ItemRewriter<C extends ClientboundPacketType, S extends Serverbound
     @Override
     public @Nullable Item handleItemToClient(final UserConnection connection, @Nullable Item item) {
         if (item == null) return null;
-        if (protocol.getMappingData() != null && !Mappings.isIntIdIdentity(protocol.getMappingData().getItemMappings())) {
-            item.setIdentifier(protocol.getMappingData().getNewItemId(item.identifier()));
+        final MappingData mappingData = protocol.getMappingData();
+        if (mappingData != null && mappingData.getItemMappings() != null) {
+            item.setIdentifier(connection != null ? CustomRegistryStorage.mappedItemIdToClient(connection, protocol, mappingData, item.identifier()) : mappingData.getNewItemId(item.identifier()));
         }
         return item;
     }
@@ -103,8 +105,9 @@ public class ItemRewriter<C extends ClientboundPacketType, S extends Serverbound
     @Override
     public @Nullable Item handleItemToServer(final UserConnection connection, @Nullable Item item) {
         if (item == null) return null;
-        if (protocol.getMappingData() != null && !Mappings.isIntIdIdentity(protocol.getMappingData().getItemMappings())) {
-            item.setIdentifier(protocol.getMappingData().getOldItemId(item.identifier()));
+        final MappingData mappingData = protocol.getMappingData();
+        if (mappingData != null && mappingData.getItemMappings() != null) {
+            item.setIdentifier(connection != null ? CustomRegistryStorage.mappedItemIdToServer(connection, protocol, mappingData, item.identifier()) : mappingData.getOldItemId(item.identifier()));
         }
         return item;
     }
@@ -141,7 +144,7 @@ public class ItemRewriter<C extends ClientboundPacketType, S extends Serverbound
         }
 
         if (mappingData.getItemMappings() != null) {
-            item.setIdentifier(mappingData.getOldItemId(item.identifier()));
+            item.setIdentifier(CustomRegistryStorage.mappedItemIdToServer(connection, protocol, mappingData, item.identifier()));
         }
         return item;
     }
@@ -330,12 +333,12 @@ public class ItemRewriter<C extends ClientboundPacketType, S extends Serverbound
     }
 
     public void registerCooldown(C packetType) {
-        if (protocol.getMappingData() == null || Mappings.isIntIdIdentity(protocol.getMappingData().getItemMappings())) {
+        if (protocol.getMappingData() == null || protocol.getMappingData().getItemMappings() == null) {
             return;
         }
         protocol.registerClientbound(packetType, wrapper -> {
             int itemId = wrapper.read(Types.VAR_INT);
-            wrapper.write(Types.VAR_INT, protocol.getMappingData().getNewItemId(itemId));
+            wrapper.write(Types.VAR_INT, CustomRegistryStorage.mappedItemIdToClient(wrapper.user(), protocol, protocol.getMappingData(), itemId));
         });
     }
 

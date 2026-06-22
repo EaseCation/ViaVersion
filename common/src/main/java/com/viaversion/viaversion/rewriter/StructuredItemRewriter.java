@@ -40,6 +40,7 @@ import com.viaversion.viaversion.api.protocol.Protocol;
 import com.viaversion.viaversion.api.protocol.packet.ClientboundPacketType;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.protocol.packet.ServerboundPacketType;
+import com.viaversion.viaversion.api.protocol.storage.CustomRegistryStorage;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.api.type.types.version.VersionedTypesHolder;
 import com.viaversion.viaversion.data.item.ItemHasherBase;
@@ -90,7 +91,7 @@ public class StructuredItemRewriter<C extends ClientboundPacketType, S extends S
 
         final MappingData mappingData = protocol.getMappingData();
         if (mappingData != null && mappingData.getItemMappings() != null) {
-            item.setIdentifier(mappingData.getNewItemId(item.identifier()));
+            item.setIdentifier(CustomRegistryStorage.mappedItemIdToClient(connection, protocol, mappingData, item.identifier()));
         }
 
         handleRewritablesToClient(connection, dataContainer, itemHasher);
@@ -237,7 +238,7 @@ public class StructuredItemRewriter<C extends ClientboundPacketType, S extends S
 
         final MappingData mappingData = protocol.getMappingData();
         if (mappingData != null && mappingData.getItemMappings() != null) {
-            item.setIdentifier(mappingData.getOldItemId(item.identifier()));
+            item.setIdentifier(CustomRegistryStorage.mappedItemIdToServer(connection, protocol, mappingData, item.identifier()));
         }
 
         // Handle rewritables first, then restore backup data, then the rest
