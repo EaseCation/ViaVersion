@@ -4,7 +4,8 @@ plugins {
 }
 
 allprojects {
-    group = "com.viaversion"
+    // EaseCation fork coordinates (upstream com.viaversion), see GeyserWorkspace docs/maven-coordinates.md
+    group = "net.easecation.fork.viaversion"
     version = property("projectVersion") as String // from gradle.properties
     description = "Allows the connection of newer clients to older server versions for Minecraft servers."
 }

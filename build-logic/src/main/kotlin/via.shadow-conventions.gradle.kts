@@ -27,18 +27,18 @@ publishing {
     publications.create<MavenPublication>("mavenJava") {
         groupId = rootProject.group as String
         artifactId = project.name
-        version = rootProject.version as String
+        version = (rootProject.version as String).removeSuffix("-SNAPSHOT") + "-ec." + rootProject.property("forkRevision")
+        pom.properties.set(mapOf("upstream.groupId" to "com.viaversion", "upstream.version" to rootProject.version as String))
 
         artifact(tasks["shadowJar"])
         artifact(tasks["sourcesJar"])
     }
+    // EaseCation private repository (Aliyun Yunxiao Packages); publications always carry a release version.
+    // Credentials: yunxiaoMavenUsername / yunxiaoMavenPassword in ~/.gradle/gradle.properties.
     repositories.maven {
-        name = "Via"
-        url = uri("https://repo.viaversion.com/")
+        name = "yunxiaoMaven"
+        url = uri("https://easecation-cn-hangzhou.devops.aliyuncs.com/packages/api/protocol/maven/14075-release-h64s7e")
         credentials(PasswordCredentials::class)
-        authentication {
-            create<BasicAuthentication>("basic")
-        }
     }
 }
 
